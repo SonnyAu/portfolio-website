@@ -1,77 +1,166 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, Suspense, lazy } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import Preloader from "@/components/preloader"
-import Header from "@/components/header"
-import HeroSection from "@/components/hero-section"
-import AboutSection from "@/components/about-section"
-import SkillsSection from "@/components/skills-section"
-import ProjectsSection from "@/components/projects-section"
-import ContactSection from "@/components/contact-section"
-import CustomCursor from "@/components/custom-cursor"
+import { TextPlugin } from "gsap/TextPlugin"
+import dynamic from "next/dynamic"
 
-gsap.registerPlugin(ScrollTrigger)
+// Lazy load components for better performance
+const AdvancedPreloader = lazy(() => import("@/components/advanced-preloader"))
+const Header = lazy(() => import("@/components/header"))
+const HeroSection = lazy(() => import("@/components/hero-section"))
+const AboutSection = lazy(() => import("@/components/about-section"))
+const ExperienceSection = lazy(() => import("@/components/experience-section"))
+const SkillsSection = lazy(() => import("@/components/skills-section"))
+const ProjectsSection = lazy(() => import("@/components/projects-section"))
+const ContactSection = lazy(() => import("@/components/contact-section"))
+
+// Dynamic imports for non-critical components
+const CustomCursor = dynamic(() => import("@/components/custom-cursor"), { ssr: false })
+const SpeedLines = dynamic(() => import("@/components/speed-lines"), { ssr: false })
+const F1TelemetryBackground = dynamic(() => import("@/components/f1-telemetry-background"), { ssr: false })
+const PerformanceMonitor = dynamic(() => import("@/components/performance-monitor"), { ssr: false })
+
+gsap.registerPlugin(ScrollTrigger, TextPlugin)
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+    <div className="text-[#00D2BE] font-f1">Loading...</div>
+  </div>
+)
 
 export default function Portfolio() {
   const mainContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Initially hide the main content using GSAP
+    // Performance optimization: Reduce motion for users who prefer it
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    if (prefersReducedMotion) {
+      gsap.globalTimeline.clear()
+      gsap.set("*", { clearProps: "all" })
+    }
+
+    // Initially hide the main content
     gsap.set(mainContentRef.current, { opacity: 0, visibility: "hidden" })
 
-    // Animate main content in after the preloader is guaranteed to be gone
-    // The delay here should be slightly longer than the preloader's total animation duration
-    gsap.to(mainContentRef.current, {
-      opacity: 1,
-      visibility: "visible",
-      duration: 1,
-      ease: "power3.out",
-      delay: 2.8, // Preloader animation is ~2.5s, so 2.8s gives a small buffer
-      onComplete: () => {
-        document.body.style.cursor = "default"
-        window.scrollTo(0, 0) // Ensure scroll position is at top
+    // Listen for preloader completion
+    const handlePreloaderComplete = () => {
+      // Clear any existing animations
+      gsap.killTweensOf(mainContentRef.current)
 
-        // Animate sections after main content is visible
-        gsap.utils.toArray<HTMLElement>(".section").forEach((section) => {
-          gsap.fromTo(
-            section.children,
-            { y: 50, opacity: 0 },
-            {
-              y: 0,
-              opacity: 1,
-              stagger: 0.2,
-              duration: 1,
-              ease: "power3.out",
-              scrollTrigger: {
-                trigger: section,
-                start: "top 80%",
-                end: "top 20%",
-                toggleActions: "play none none none",
-              },
-            },
-          )
-        })
-      },
-    })
+      gsap.to(mainContentRef.current, {
+        opacity: 1,
+        visibility: "visible",
+        duration: prefersReducedMotion ? 0.01 : 1,
+        ease: "power3.out",
+        delay: prefersReducedMotion ? 0 : 0.2,
+        onComplete: () => {
+          document.body.style.cursor = "default"
+          window.scrollTo(0, 0)
+
+          if (!prefersReducedMotion) {
+            // Enhanced section animations with proper cleanup
+            gsap.utils.toArray<HTMLElement>(".section").forEach((section, index) => {
+              const elements = section.children
+
+              // Kill any existing animations on these elements
+              gsap.killTweensOf(elements)
+
+              gsap.fromTo(
+                elements,
+                {
+                  y: 100,
+                  opacity: 0,
+                  scale: 0.95,
+                },
+                {
+                  y: 0,
+                  opacity: 1,
+                  scale: 1,
+                  stagger: 0.15,
+                  duration: 1.2,
+                  ease: "power3.out",
+                  scrollTrigger: {
+                    trigger: section,
+                    start: "top 85%",
+                    end: "top 15%",
+                    toggleActions: "play none none none",
+                    id: `section-${index}`,
+                    onComplete: () => {
+                      // Cleanup for performance
+                      ScrollTrigger.getById(`section-${index}`)?.kill()
+                    },
+                  },
+                },
+              )
+            })
+
+            // Enhanced parallax effects with cleanup
+            gsap.utils.toArray<HTMLElement>(".parallax-slow").forEach((element, index) => {
+              gsap.killTweensOf(element)
+
+              gsap.to(element, {
+                yPercent: -50,
+                ease: "none",
+                scrollTrigger: {
+                  trigger: element,
+                  start: "top bottom",
+                  end: "bottom top",
+                  scrub: 1,
+                  id: `parallax-${index}`,
+                },
+              })
+            })
+
+            // Smooth scroll enhancements
+            ScrollTrigger.normalizeScroll(true)
+          }
+        },
+      })
+    }
+
+    window.addEventListener("preloaderComplete", handlePreloaderComplete)
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener("preloaderComplete", handlePreloaderComplete)
+      // Kill all ScrollTrigger instances
+      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      // Clear GSAP global timeline
+      gsap.globalTimeline.clear()
+    }
   }, [])
 
   return (
     <>
-      {/* Preloader is always rendered, and handles its own disappearance */}
-      <Preloader />
+      <Suspense fallback={<LoadingFallback />}>
+        <AdvancedPreloader />
+      </Suspense>
 
-      {/* Main content is initially hidden by GSAP and then animated in */}
-      <div ref={mainContentRef} className="bg-[#0a0a0a] text-neutral-200 font-sans">
-        <CustomCursor />
-        <Header />
-        <main>
-          <HeroSection />
-          <AboutSection />
-          <SkillsSection />
-          <ProjectsSection />
-          <ContactSection />
+      <div ref={mainContentRef} className="bg-[#0a0a0a] text-neutral-200 font-f1 overflow-x-hidden relative">
+        <Suspense fallback={null}>
+          <F1TelemetryBackground />
+          <SpeedLines />
+          <CustomCursor />
+          <PerformanceMonitor />
+        </Suspense>
+
+        <Suspense fallback={<LoadingFallback />}>
+          <Header />
+        </Suspense>
+
+        <main className="relative z-10">
+          <Suspense fallback={<LoadingFallback />}>
+            <HeroSection />
+            <AboutSection />
+            <ExperienceSection />
+            <SkillsSection />
+            <ProjectsSection />
+            <ContactSection />
+          </Suspense>
         </main>
       </div>
     </>
