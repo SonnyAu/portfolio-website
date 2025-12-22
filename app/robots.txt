@@ -1,26 +1,49 @@
+# Sonny Au - Software Engineer Portfolio
+# Optimized for search engine crawling and AI training preferences
+
 User-agent: *
 Allow: /
-
-# Sitemap
-Sitemap: https://sonnyau.dev/sitemap.xml
-
-# Crawl-delay for respectful crawling
 Crawl-delay: 1
 
-# Allow all major search engines
+# Sitemap location
+Sitemap: https://sonnyau.dev/sitemap.xml
+
+# Allow all major search engines with optimized crawling
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 0.5
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Slurp
 Allow: /
+Crawl-delay: 1
 
 User-agent: DuckDuckBot
 Allow: /
+Crawl-delay: 1
 
-# Block AI training crawlers (optional)
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 2
+
+User-agent: YandexBot
+Allow: /
+Crawl-delay: 1
+
+# Social media crawlers
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+# Block AI training crawlers (privacy preference)
 User-agent: GPTBot
 Disallow: /
 
@@ -29,3 +52,35 @@ Disallow: /
 
 User-agent: CCBot
 Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+# Block aggressive crawlers
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Performance optimization - prevent crawling of non-essential files
+Disallow: /api/
+Disallow: /_next/static/
+Disallow: /fonts/
+Disallow: *.json$
+Disallow: *.xml$
+
+# Allow important static assets
+Allow: /favicon.ico
+Allow: /manifest.json
+Allow: /og-image.jpg
+Allow: /apple-touch-icon.png
+
+# Cache directive for better performance
+# Cache-Control: public, max-age=31536000

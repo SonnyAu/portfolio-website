@@ -29,7 +29,12 @@ export default function Header() {
   const scrollToSection = (id: string) => {
     const section = document.getElementById(id)
     if (section) {
-      section.scrollIntoView({ behavior: "smooth" })
+      // Use faster scroll behavior
+      section.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      })
       setIsMenuOpen(false)
     }
   }

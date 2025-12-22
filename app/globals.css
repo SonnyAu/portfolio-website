@@ -2,12 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enhanced F1 Font Loading with Performance Optimization */
 @font-face {
   font-family: "Formula1";
   src: url("/fonts/Formula1-Regular_web_0.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
@@ -16,10 +19,13 @@
   font-weight: 700;
   font-style: normal;
   font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @layer base {
   :root {
+    /* Enhanced F1 Color System */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -40,29 +46,74 @@
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
     --radius: 0.5rem;
+
+    /* F1 Performance Variables */
+    --f1-primary: #00d2be;
+    --f1-secondary: #00a896;
+    --f1-accent: #ff0000;
+    --f1-warning: #ffa500;
+    --f1-success: #00ff00;
+    --scroll-intensity: 0.1;
+    --telemetry-opacity: 0.05;
+    --performance-level: 1;
+  }
+
+  /* Enhanced dark mode support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --telemetry-opacity: 0.08;
+    }
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
+
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-family: "Formula1", "Inter", sans-serif;
+    font-family: "Formula1", var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
     background: #0a0a0a;
     position: relative;
+    /* Enhanced font rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    /* GPU acceleration for better performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    /* Faster scroll behavior */
+    scroll-behavior: auto;
+    scrollbar-gutter: stable;
   }
 
-  /* Only hide cursor on desktop */
-  @media (min-width: 768px) {
+  /* Enhanced cursor hiding for desktop */
+  @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
     body {
       cursor: none;
     }
+
+    /* Show cursor on interactive elements for accessibility */
+    button:hover,
+    a:hover,
+    input:focus,
+    textarea:focus,
+    [role="button"]:hover {
+      cursor: pointer;
+    }
   }
 
-  /* F1 Telemetry-Inspired Background System */
+  /* Championship-Level F1 Background System */
   body::before {
     content: "";
     position: fixed;
@@ -71,42 +122,36 @@
     right: 0;
     bottom: 0;
     z-index: -3;
-    /* Base telemetry grid */
-    /* Data flow lines - horizontal */
+    /* Enhanced telemetry grid with dynamic intensity */
+    /* Primary telemetry grid */
     background: repeating-linear-gradient(
         0deg,
         transparent,
-        transparent 40px,
-        rgba(0, 210, 190, 0.02) 40px,
-        rgba(0, 210, 190, 0.02) 41px,
-        transparent 41px,
         transparent 80px,
-        rgba(0, 210, 190, 0.015) 80px,
-        rgba(0, 210, 190, 0.015) 81px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * var(--performance-level))) 80px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * var(--performance-level))) 81px,
         transparent 81px,
-        transparent 120px
-      ), /* Data flow lines - vertical */
+        transparent 160px
+      ), /* Secondary grid */
       repeating-linear-gradient(
         90deg,
         transparent,
-        transparent 60px,
-        rgba(0, 210, 190, 0.015) 60px,
-        rgba(0, 210, 190, 0.015) 61px,
-        transparent 61px,
-        transparent 120px,
-        rgba(0, 210, 190, 0.01) 120px,
-        rgba(0, 210, 190, 0.01) 121px,
-        transparent 121px,
-        transparent 180px
-      ), /* Telemetry data points */ radial-gradient(circle at 20% 20%, rgba(0, 210, 190, 0.03) 0%, transparent 30%),
-      radial-gradient(circle at 80% 80%, rgba(0, 210, 190, 0.025) 0%, transparent 25%),
-      radial-gradient(circle at 60% 40%, rgba(0, 210, 190, 0.02) 0%, transparent 20%), /* Base gradient */
-      linear-gradient(135deg, #0a0a0a 0%, #0d0d0d 25%, #0a0a0a 50%, #0f0f0f 75%, #0a0a0a 100%);
-    background-size: 100% 100%, 100% 100%, 800px 800px, 600px 600px, 400px 400px, 100% 100%;
-    animation: telemetryFlow 30s linear infinite;
+        transparent 100px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.5)) 100px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.5)) 101px,
+        transparent 101px,
+        transparent 200px
+      ), /* Dynamic performance indicators */
+      radial-gradient(circle at 25% 25%, rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.3)) 0%, transparent 40%),
+      radial-gradient(circle at 75% 75%, rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.2)) 0%, transparent 35%),
+      /* Base gradient */
+      linear-gradient(135deg, #0a0a0a 0%, #0d0d0d 25%, #0a0a0a 50%, #0e0e0e 75%, #0a0a0a 100%);
+    background-size: 100% 100%, 100% 100%, 800px 800px, 600px 600px, 100% 100%;
+    will-change: background-position, opacity;
+    animation: championshipTelemetry 60s linear infinite;
   }
 
-  /* F1 Data Stream Overlay */
+  /* Enhanced F1 data stream overlay */
   body::after {
     content: "";
     position: fixed;
@@ -115,59 +160,71 @@
     right: 0;
     bottom: 0;
     z-index: -2;
-    /* Racing data streams */
-    /* Speed data lines */
+    /* Racing line indicators */
     background: repeating-linear-gradient(
         45deg,
         transparent,
-        transparent 100px,
-        rgba(0, 210, 190, 0.008) 100px,
-        rgba(0, 210, 190, 0.008) 102px,
-        transparent 102px,
-        transparent 200px,
-        rgba(0, 210, 190, 0.005) 200px,
-        rgba(0, 210, 190, 0.005) 201px,
-        transparent 201px,
+        transparent 150px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.3)) 150px,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.3)) 152px,
+        transparent 152px,
         transparent 300px
-      ), /* Tire temperature zones */
-      conic-gradient(
-        from 0deg at 25% 25%,
-        transparent 0deg,
-        rgba(0, 210, 190, 0.003) 30deg,
-        transparent 60deg,
-        rgba(0, 210, 190, 0.002) 90deg,
-        transparent 120deg,
-        transparent 240deg,
-        rgba(0, 210, 190, 0.003) 270deg,
-        transparent 300deg,
-        transparent 360deg
-      ), /* Brake temperature gradients */
-      radial-gradient(ellipse at 75% 25%, rgba(255, 100, 100, 0.005) 0%, transparent 40%),
-      radial-gradient(ellipse at 25% 75%, rgba(255, 100, 100, 0.003) 0%, transparent 35%);
-    background-size: 100% 100%, 400px 400px, 300px 300px, 250px 250px;
-    animation: dataStream 25s ease-in-out infinite;
+      ), /* Performance zones */
+      radial-gradient(ellipse at 30% 30%, rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.15)) 0%, transparent 60%),
+      /* Brake zones */
+      radial-gradient(ellipse at 70% 70%, rgba(255, 100, 100, calc(var(--scroll-intensity) * 0.1)) 0%, transparent 50%),
+      /* DRS zones */
+      linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(0, 255, 0, calc(var(--telemetry-opacity) * 0.2)) 20%,
+        transparent 40%,
+        rgba(0, 255, 0, calc(var(--telemetry-opacity) * 0.2)) 60%,
+        transparent 80%
+      );
+    background-size: 100% 100%, 400px 400px, 300px 300px, 100% 100%;
+    will-change: background-position, transform;
+    animation: f1DataStream 45s ease-in-out infinite;
+  }
+
+  /* Enhanced accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    body::before,
+    body::after {
+      animation: none !important;
+    }
+
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    :root {
+      --telemetry-opacity: 0.2;
+      --scroll-intensity: 0.3;
+    }
   }
 }
 
 @layer utilities {
+  /* Enhanced F1 Grid System */
   .bg-grid {
-    /* F1 Telemetry Grid System */
-    /* Primary telemetry grid */
-    background-image: linear-gradient(to right, rgba(0, 210, 190, 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0, 210, 190, 0.06) 1px, transparent 1px), /* Data point markers */
-      radial-gradient(circle at 0% 0%, rgba(0, 210, 190, 0.08) 2px, transparent 2px),
-      radial-gradient(circle at 100% 100%, rgba(0, 210, 190, 0.08) 2px, transparent 2px), /* Tire track integration */
-      repeating-linear-gradient(
-        15deg,
-        transparent,
-        transparent 8px,
-        rgba(0, 210, 190, 0.01) 8px,
-        rgba(0, 210, 190, 0.01) 9px,
-        transparent 9px,
-        transparent 24px
-      );
-    background-size: 80px 80px, 80px 80px, 80px 80px, 80px 80px, 40px 40px;
-    background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+    /* Primary telemetry lines */
+    background-image: linear-gradient(to right, rgba(0, 210, 190, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 210, 190, 0.08) 1px, transparent 1px), /* Corner markers */
+      radial-gradient(circle at 0% 0%, rgba(0, 210, 190, 0.12) 3px, transparent 3px),
+      radial-gradient(circle at 100% 0%, rgba(0, 210, 190, 0.12) 3px, transparent 3px),
+      radial-gradient(circle at 0% 100%, rgba(0, 210, 190, 0.12) 3px, transparent 3px),
+      radial-gradient(circle at 100% 100%, rgba(0, 210, 190, 0.12) 3px, transparent 3px), /* Performance indicators */
+      radial-gradient(circle at 25% 25%, rgba(255, 100, 100, 0.04) 2px, transparent 2px),
+      radial-gradient(circle at 75% 75%, rgba(0, 255, 0, 0.04) 2px, transparent 2px);
+    background-size: 120px 120px, 120px 120px, 120px 120px, 120px 120px, 120px 120px, 120px 120px, 240px 240px, 240px
+      240px;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
     position: relative;
   }
 
@@ -175,372 +232,369 @@
     content: "";
     position: absolute;
     inset: 0;
-    /* Dynamic telemetry overlay */
-    /* Racing line data */
-    background: radial-gradient(ellipse at top left, rgba(0, 210, 190, 0.04) 0%, transparent 60%),
-      radial-gradient(ellipse at bottom right, rgba(0, 210, 190, 0.04) 0%, transparent 60%),
-      /* Sector timing visualization */
-      conic-gradient(
-        from 45deg at 50% 50%,
-        transparent 0deg,
-        rgba(0, 210, 190, 0.01) 120deg,
-        transparent 240deg,
-        rgba(0, 210, 190, 0.008) 360deg
-      );
-    animation: telemetryPulse 12s ease-in-out infinite;
+    background: radial-gradient(
+        ellipse at top left,
+        rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.4)) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse at bottom right,
+        rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.4)) 0%,
+        transparent 70%
+      ),
+      radial-gradient(ellipse at center, rgba(255, 255, 255, calc(var(--scroll-intensity) * 0.02)) 0%, transparent 50%);
+    will-change: opacity, transform;
+    animation: championshipPulse 20s ease-in-out infinite;
   }
 
+  /* Enhanced F1 Typography */
   .font-f1 {
-    font-family: "Formula1", sans-serif;
+    font-family: "Formula1", var(--font-inter), "Inter", sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1;
   }
 
   .font-f1-bold {
-    font-family: "Formula1", sans-serif;
+    font-family: "Formula1", var(--font-inter), "Inter", sans-serif;
     font-weight: 700;
+    font-feature-settings: "kern" 1, "liga" 1;
   }
 
+  /* Enhanced text utilities */
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  /* F1 Section Backgrounds with Telemetry */
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Championship-level section backgrounds */
   .section {
     position: relative;
-    background: rgba(10, 10, 10, 0.85);
+    background: rgba(10, 10, 10, 0.95);
     backdrop-filter: blur(12px);
+    will-change: transform, opacity;
+    contain: layout style paint;
   }
 
   .section::before {
     content: "";
     position: absolute;
     inset: 0;
-    /* Telemetry data overlay */
-    /* Data grid pattern */
-    background: linear-gradient(45deg, transparent 49%, rgba(0, 210, 190, 0.008) 50%, transparent 51%),
-      linear-gradient(-45deg, transparent 49%, rgba(0, 210, 190, 0.008) 50%, transparent 51%), /* Speed sensor lines */
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 20px,
-        rgba(0, 210, 190, 0.005) 20px,
-        rgba(0, 210, 190, 0.005) 21px,
-        transparent 21px,
-        transparent 60px
-      );
-    background-size: 60px 60px, 60px 60px, 100% 100%;
+    background: linear-gradient(
+        45deg,
+        transparent 49%,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.5)) 50%,
+        transparent 51%
+      ),
+      linear-gradient(
+        -45deg,
+        transparent 49%,
+        rgba(0, 210, 190, calc(var(--telemetry-opacity) * 0.5)) 50%,
+        transparent 51%
+      ), radial-gradient(circle at center, rgba(0, 210, 190, calc(var(--scroll-intensity) * 0.1)) 0%, transparent 70%);
+    background-size: 100px 100px, 100px 100px, 100% 100%;
     opacity: 0.4;
     z-index: -1;
+    will-change: opacity;
   }
 
-  /* Brake Disc Glow Effects */
-  .brake-glow {
-    position: relative;
+  /* Performance optimization utilities */
+  .will-change-transform {
+    will-change: transform;
   }
 
-  .brake-glow::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 100px;
-    height: 100px;
-    background: radial-gradient(circle, rgba(255, 100, 100, 0.2) 0%, rgba(255, 150, 100, 0.1) 30%, transparent 70%);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  .will-change-auto {
+    will-change: auto;
+  }
+
+  .content-visibility-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+  }
+
+  /* GPU acceleration */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Enhanced gradients */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+
+  .bg-gradient-conic {
+    background: conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops));
+  }
+
+  .bg-gradient-f1 {
+    background: linear-gradient(135deg, var(--f1-primary) 0%, var(--f1-secondary) 50%, var(--f1-primary) 100%);
+  }
+
+  /* F1 Performance indicators */
+  .performance-excellent {
+    --performance-level: 1.2;
+    --telemetry-opacity: 0.08;
+  }
+
+  .performance-good {
+    --performance-level: 1;
+    --telemetry-opacity: 0.06;
+  }
+
+  .performance-needs-improvement {
+    --performance-level: 0.8;
+    --telemetry-opacity: 0.04;
+  }
+
+  /* Enhanced loading states */
+  .loading-skeleton {
+    background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+    background-size: 200% 100%;
+    animation: f1Loading 2s infinite;
+  }
+
+  /* F1 Animation utilities */
+  .animate-f1-pulse {
+    animation: f1Pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-telemetry {
+    animation: telemetryFlow 3s linear infinite;
+  }
+
+  /* Intersection observer optimizations */
+  .lazy-load {
     opacity: 0;
-    animation: brakeGlow 3s ease-in-out infinite;
+    transform: translateY(30px) scale(0.95);
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Telemetry Data Flow */
-  .data-flow {
-    position: relative;
-    overflow: hidden;
+  .lazy-load.loaded {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 
-  .data-flow::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(0, 210, 190, 0.05) 25%,
-      rgba(0, 210, 190, 0.1) 50%,
-      rgba(0, 210, 190, 0.05) 75%,
-      transparent
-    );
-    animation: dataFlow 4s ease-in-out infinite;
+  /* Enhanced focus states for accessibility */
+  .focus-f1 {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00D2BE] focus-visible:ring-offset-2 focus-visible:ring-offset-black;
   }
 
-  /* Speed Visualization */
-  .speed-viz {
-    position: relative;
+  /* Container queries support */
+  .container-responsive {
+    container-type: inline-size;
   }
 
-  .speed-viz::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    right: -100px;
-    width: 200px;
-    height: 4px;
-    background: linear-gradient(90deg, rgba(0, 210, 190, 0.8) 0%, rgba(0, 210, 190, 0.4) 50%, transparent 100%);
-    transform: translateY(-50%);
-    animation: speedPulse 2s ease-in-out infinite;
-  }
-
-  /* Tire Temperature Visualization */
-  .tire-temp {
-    background: radial-gradient(
-      circle at center,
-      rgba(0, 210, 190, 0.02) 0%,
-      rgba(255, 100, 100, 0.01) 50%,
-      transparent 100%
-    );
-    animation: tireHeat 8s ease-in-out infinite;
+  @container (min-width: 768px) {
+    .container-md\:text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
   }
 }
 
-/* F1 Telemetry Animations */
-@keyframes telemetryFlow {
+/* Championship-Level Animations */
+@keyframes championshipTelemetry {
   0%,
   100% {
-    background-position: 0 0, 0 0, 0% 0%, 100% 100%, 50% 50%, 0% 0%;
+    background-position: 0 0, 0 0, 0% 0%, 100% 100%, 0% 0%;
+    opacity: 1;
   }
   25% {
-    background-position: 0 20px, 20px 0, 25% 25%, 75% 75%, 25% 75%, 25% 25%;
+    background-position: 0 40px, 40px 0, 25% 25%, 75% 75%, 25% 25%;
+    opacity: 0.9;
   }
   50% {
-    background-position: 0 40px, 40px 0, 50% 50%, 50% 50%, 0% 100%, 50% 50%;
+    background-position: 0 80px, 80px 0, 50% 50%, 50% 50%, 50% 50%;
+    opacity: 1;
   }
   75% {
-    background-position: 0 60px, 60px 0, 75% 75%, 25% 25%, 75% 25%, 75% 75%;
+    background-position: 0 120px, 120px 0, 75% 75%, 25% 25%, 75% 75%;
+    opacity: 0.9;
   }
 }
 
-@keyframes dataStream {
+@keyframes f1DataStream {
   0%,
   100% {
-    background-position: 0 0, 0% 0%, 0% 0%, 100% 100%;
+    background-position: 0 0, 0% 0%, 100% 100%, 0% 0%;
+    transform: translateX(0);
   }
   33% {
-    background-position: 100px 100px, 33% 33%, 33% 33%, 67% 67%;
+    background-position: 200px 200px, 33% 33%, 67% 67%, 33% 33%;
+    transform: translateX(2px);
   }
   66% {
-    background-position: 200px 200px, 66% 66%, 66% 66%, 33% 33%;
+    background-position: 400px 400px, 66% 66%, 34% 34%, 66% 66%;
+    transform: translateX(-2px);
   }
 }
 
-@keyframes telemetryPulse {
+@keyframes championshipPulse {
   0%,
   100% {
     opacity: 0.3;
     transform: scale(1) rotate(0deg);
   }
+  25% {
+    opacity: 0.5;
+    transform: scale(1.02) rotate(0.5deg);
+  }
   50% {
-    opacity: 0.6;
-    transform: scale(1.02) rotate(1deg);
+    opacity: 0.7;
+    transform: scale(1.01) rotate(0deg);
+  }
+  75% {
+    opacity: 0.5;
+    transform: scale(1.02) rotate(-0.5deg);
   }
 }
 
-@keyframes brakeGlow {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  50% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.2);
-  }
-}
-
-@keyframes dataFlow {
+@keyframes f1Loading {
   0% {
-    left: -100%;
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
+    background-position: 200% 0;
   }
   100% {
-    left: 100%;
-    opacity: 0;
+    background-position: -200% 0;
   }
 }
 
-@keyframes speedPulse {
+@keyframes f1Pulse {
   0%,
   100% {
-    opacity: 0.3;
-    transform: translateY(-50%) scaleX(0.5);
-  }
-  50% {
     opacity: 1;
-    transform: translateY(-50%) scaleX(1);
-  }
-}
-
-@keyframes tireHeat {
-  0%,
-  100% {
-    background: radial-gradient(
-      circle at center,
-      rgba(0, 210, 190, 0.02) 0%,
-      rgba(255, 100, 100, 0.01) 50%,
-      transparent 100%
-    );
+    transform: scale(1);
   }
   50% {
-    background: radial-gradient(
-      circle at center,
-      rgba(0, 210, 190, 0.04) 0%,
-      rgba(255, 150, 100, 0.02) 50%,
-      transparent 100%
-    );
+    opacity: 0.7;
+    transform: scale(1.05);
   }
 }
 
-/* Scroll-Triggered Brake Effects */
-@keyframes scrollBrakeGlow {
+@keyframes telemetryFlow {
   0% {
-    box-shadow: 0 0 0 rgba(255, 100, 100, 0);
+    transform: translateX(0);
+    opacity: 0.5;
   }
   50% {
-    box-shadow: 0 0 30px rgba(255, 100, 100, 0.3), 0 0 60px rgba(255, 100, 100, 0.1);
+    transform: translateX(10px);
+    opacity: 1;
   }
   100% {
-    box-shadow: 0 0 0 rgba(255, 100, 100, 0);
+    transform: translateX(0);
+    opacity: 0.5;
   }
 }
 
-.scroll-brake-active {
-  animation: scrollBrakeGlow 1s ease-out;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  background-color: #0a0a0a;
-}
-
-/* F1 Telemetry-Inspired Scrollbar */
+/* Enhanced Scrollbar with F1 Championship styling */
 ::-webkit-scrollbar {
-  width: 14px;
+  width: 12px;
 }
 
 ::-webkit-scrollbar-track {
   background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 50%, #1a1a1a 100%);
-  border-radius: 7px;
-  border: 1px solid #333;
+  border-radius: 6px;
+  border: 1px solid #2a2a2a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #00d2be 0%, #00a896 50%, #007a6b 100%);
-  border-radius: 7px;
+  background: linear-gradient(180deg, #00d2be 0%, #00a896 30%, #007a6b 70%, #00d2be 100%);
+  border-radius: 6px;
   border: 2px solid #1a1a1a;
-  box-shadow: inset 0 0 3px rgba(0, 210, 190, 0.3);
+  box-shadow: inset 0 0 6px rgba(0, 210, 190, 0.3);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #00f5e4 0%, #00d2be 50%, #00a896 100%);
-  box-shadow: 0 0 15px rgba(0, 210, 190, 0.4), inset 0 0 5px rgba(0, 210, 190, 0.2);
+  background: linear-gradient(180deg, #00f5e4 0%, #00d2be 30%, #00a896 70%, #00f5e4 100%);
+  box-shadow: inset 0 0 6px rgba(0, 210, 190, 0.5), 0 0 12px rgba(0, 210, 190, 0.4);
 }
 
-/* Enhanced mobile optimizations */
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #ffffff 0%, #00d2be 50%, #ffffff 100%);
+}
+
+/* Enhanced Mobile Optimizations */
 @media (max-width: 767px) {
+  /* Reduce background complexity for better mobile performance */
+  body::before {
+    background-size: 100% 100%, 100% 100%, 400px 400px, 300px 300px, 100% 100%;
+    animation-duration: 80s;
+  }
+
+  body::after {
+    background-size: 100% 100%, 200px 200px, 150px 150px, 100% 100%;
+    animation-duration: 60s;
+  }
+
+  .bg-grid {
+    background-size: 80px 80px, 80px 80px, 80px 80px, 80px 80px, 80px 80px, 80px 80px, 160px 160px, 160px 160px;
+  }
+
+  /* Enhanced touch targets */
   button,
   a,
   [role="button"],
   .project-card {
-    -webkit-tap-highlight-color: rgba(0, 210, 190, 0.1);
-    tap-highlight-color: rgba(0, 210, 190, 0.1);
-    min-height: 44px; /* Ensure minimum touch target size */
+    -webkit-tap-highlight-color: rgba(0, 210, 190, 0.2);
+    tap-highlight-color: rgba(0, 210, 190, 0.2);
+    min-height: 44px;
     min-width: 44px;
+    touch-action: manipulation;
   }
 
-  /* Compact mobile typography */
-  h1 {
-    line-height: 1.1;
-  }
-
-  h2 {
+  /* Optimized mobile typography with better scaling */
+  .text-3xl {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
     line-height: 1.2;
   }
-
-  h3 {
-    line-height: 1.3;
+  .text-4xl {
+    font-size: clamp(1.875rem, 5vw, 2.25rem);
+    line-height: 1.1;
+  }
+  .text-6xl {
+    font-size: clamp(2.25rem, 6vw, 3rem);
+    line-height: 1;
+  }
+  .text-7xl {
+    font-size: clamp(2.5rem, 7vw, 3.5rem);
+    line-height: 0.9;
+  }
+  .text-8xl {
+    font-size: clamp(3rem, 8vw, 4rem);
+    line-height: 0.9;
   }
 
-  /* Optimize mobile spacing */
+  /* Compact mobile spacing */
   .section {
     padding-top: 3rem;
     padding-bottom: 3rem;
   }
 
-  /* Mobile telemetry patterns */
-  body::before {
-    background-size: 100% 100%, 100% 100%, 400px 400px, 300px 300px, 200px 200px, 100% 100%;
-  }
-
-  body::after {
-    background-size: 100% 100%, 200px 200px, 150px 150px, 125px 125px;
-  }
-
-  .bg-grid {
-    background-size: 40px 40px, 40px 40px, 40px 40px, 40px 40px, 20px 20px;
-  }
-
-  /* Compact mobile containers */
   .container {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
-  /* Mobile-optimized text sizes */
-  .text-4xl {
-    font-size: 1.875rem;
-    line-height: 2.25rem;
-  }
-
-  .text-3xl {
-    font-size: 1.5rem;
-    line-height: 2rem;
-  }
-
-  .text-2xl {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
-  }
-
-  /* Compact mobile forms */
+  /* Prevent zoom on form inputs */
   input,
   textarea,
+  select,
   button {
-    font-size: 16px; /* Prevent zoom on iOS */
-  }
-
-  /* Mobile-specific grid optimizations */
-  .grid {
-    gap: 0.75rem;
-  }
-
-  /* Compact mobile cards */
-  .project-card {
-    border-radius: 0.5rem;
-  }
-
-  /* Mobile-optimized animations */
-  .animate-bounce {
-    animation-duration: 1.5s;
+    font-size: 16px;
   }
 
   /* Compact mobile scrollbar */
@@ -548,291 +602,141 @@ body {
     width: 8px;
   }
 
-  ::-webkit-scrollbar-thumb {
-    border-radius: 4px;
-    border: 1px solid #1a1a1a;
+  /* Reduce motion for better mobile performance */
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-pulse {
+      animation-duration: 3s;
+    }
   }
 }
 
-/* Ultra-compact layout for very small screens */
+/* Ultra-compact for very small screens */
 @media (max-width: 375px) {
+  .text-3xl {
+    font-size: clamp(1.25rem, 5vw, 1.5rem);
+  }
+  .text-4xl {
+    font-size: clamp(1.5rem, 6vw, 1.875rem);
+  }
+  .text-6xl {
+    font-size: clamp(1.875rem, 7vw, 2.25rem);
+  }
+  .text-7xl {
+    font-size: clamp(2rem, 8vw, 2.5rem);
+  }
+  .text-8xl {
+    font-size: clamp(2.25rem, 9vw, 2.75rem);
+  }
+
   .container {
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 
   .section {
     padding-top: 2rem;
     padding-bottom: 2rem;
   }
-
-  /* Even more compact typography */
-  .text-4xl {
-    font-size: 1.5rem;
-    line-height: 2rem;
-  }
-
-  .text-3xl {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
-  }
-
-  .text-2xl {
-    font-size: 1.125rem;
-    line-height: 1.5rem;
-  }
-
-  /* Ultra-compact grids */
-  .grid {
-    gap: 0.5rem;
-  }
-
-  /* Minimal padding for cards */
-  .project-card .p-3 {
-    padding: 0.5rem;
-  }
 }
 
 /* Tablet optimizations */
 @media (min-width: 768px) and (max-width: 1024px) {
   body::before {
-    background-size: 100% 100%, 100% 100%, 600px 600px, 450px 450px, 300px 300px, 100% 100%;
+    background-size: 100% 100%, 100% 100%, 600px 600px, 400px 400px, 100% 100%;
   }
 
   body::after {
-    background-size: 100% 100%, 300px 300px, 225px 225px, 187px 187px;
+    background-size: 100% 100%, 300px 300px, 200px 200px, 100% 100%;
   }
 
   .bg-grid {
-    background-size: 60px 60px, 60px 60px, 60px 60px, 60px 60px, 30px 30px;
+    background-size: 100px 100px, 100px 100px, 100px 100px, 100px 100px, 100px 100px, 100px 100px, 200px 200px, 200px
+      200px;
   }
 }
 
 /* Large screen enhancements */
 @media (min-width: 1920px) {
   body::before {
-    background-size: 100% 100%, 100% 100%, 1200px 1200px, 900px 900px, 600px 600px, 100% 100%;
+    background-size: 100% 100%, 100% 100%, 1200px 1200px, 800px 800px, 100% 100%;
   }
 
   body::after {
-    background-size: 100% 100%, 600px 600px, 450px 450px, 375px 375px;
+    background-size: 100% 100%, 600px 600px, 400px 400px, 100% 100%;
   }
 
   .bg-grid {
-    background-size: 120px 120px, 120px 120px, 120px 120px, 120px 120px, 60px 60px;
+    background-size: 160px 160px, 160px 160px, 160px 160px, 160px 160px, 160px 160px, 160px 160px, 320px 320px, 320px
+      320px;
   }
 }
 
-/* Mobile-first responsive utilities */
-.mobile-compact {
-  @media (max-width: 767px) {
-    padding: 0.5rem;
-    margin: 0.25rem;
-  }
-}
-
-.mobile-text-sm {
-  @media (max-width: 767px) {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
-}
-
-.mobile-hidden {
-  @media (max-width: 767px) {
-    display: none;
-  }
-}
-
-.mobile-only {
-  @media (min-width: 768px) {
-    display: none;
-  }
-}
-
-/* Touch-friendly interactions */
-@media (hover: none) and (pointer: coarse) {
-  .hover\:scale-105:hover {
-    transform: scale(1.02);
-  }
-
-  .hover\:border-\[\#00D2BE\]:hover {
-    border-color: #00d2be;
-  }
-
-  .group:hover .group-hover\:text-\[\#00D2BE\] {
-    color: #00d2be;
-  }
-}
-
-/* Improved mobile focus states */
-@media (max-width: 767px) {
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible {
-    outline: 2px solid #00d2be;
-    outline-offset: 1px;
-    box-shadow: 0 0 0 2px rgba(0, 210, 190, 0.2);
-  }
-}
-
-/* Mobile-optimized animations */
-@media (prefers-reduced-motion: reduce) {
-  .animate-bounce,
-  .animate-pulse,
-  .animate-spin {
-    animation: none;
-  }
-
-  * {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .text-neutral-400 {
-    color: #ffffff;
-  }
-
-  .border-neutral-800 {
-    border-color: #ffffff;
-  }
-
-  .bg-neutral-800 {
-    background-color: #000000;
-  }
-}
-
-/* Performance Optimizations */
-* {
-  box-sizing: border-box;
-}
-
-/* GPU acceleration for animations */
-.will-change-transform {
-  will-change: transform;
-}
-
-.will-change-opacity {
-  will-change: opacity;
-}
-
-/* Optimize font rendering */
-body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
-
-/* Improve image loading */
-img {
-  content-visibility: auto;
-}
-
-/* Enhanced focus states for accessibility */
+/* Enhanced Accessibility */
 *:focus-visible {
   outline: 2px solid #00d2be;
   outline-offset: 2px;
   border-radius: 4px;
+  box-shadow: 0 0 0 4px rgba(0, 210, 190, 0.2);
 }
 
-/* Smooth transitions for all interactive elements */
+/* Smooth transitions with performance optimization */
 button,
 a,
 input,
 textarea,
 select {
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Enhanced gradient utilities */
-.bg-gradient-radial {
-  background: radial-gradient(circle, var(--tw-gradient-stops));
+/* Enhanced selection styling */
+::selection {
+  background-color: #00d2be;
+  color: #000000;
+  text-shadow: none;
 }
 
-.bg-gradient-conic {
-  background: conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops));
+::-moz-selection {
+  background-color: #00d2be;
+  color: #000000;
+  text-shadow: none;
 }
 
-/* Advanced animation utilities */
-@keyframes slideInFromLeft {
-  0% {
-    transform: translateX(-100%);
-    opacity: 0;
+/* Performance optimizations */
+img {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+}
+
+/* Prevent animation conflicts */
+.hero-section * {
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Ensure smooth animations */
+.gsap-animation {
+  will-change: transform, opacity;
+}
+
+.gsap-animation.complete {
+  will-change: auto;
+}
+
+/* Prevent layout shifts during animations */
+.hero-container {
+  contain: layout style paint;
+}
+
+/* Fix for Safari animation issues */
+@supports (-webkit-backdrop-filter: blur(10px)) {
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
   }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
 
-@keyframes slideInFromRight {
-  0% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInUp {
-  0% {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes scaleIn {
-  0% {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Utility classes for animations */
-.animate-slide-in-left {
-  animation: slideInFromLeft 0.6s ease-out;
-}
-
-.animate-slide-in-right {
-  animation: slideInFromRight 0.6s ease-out;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out;
-}
-
-.animate-scale-in {
-  animation: scaleIn 0.6s ease-out;
-}
-
-/* Enhanced loading states */
-.loading-skeleton {
-  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
 }
 
@@ -850,20 +754,44 @@ select {
   .text-\[\#00D2BE\] {
     color: black !important;
   }
+
+  body::before,
+  body::after {
+    display: none !important;
+  }
 }
 
-/* High contrast mode improvements */
-@media (prefers-contrast: high) {
-  .bg-\[0f0f0f\] {
-    background-color: #000000 !important;
+/* Enhanced loading states */
+.loading-f1 {
+  background: linear-gradient(90deg, #1a1a1a 25%, #00d2be 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: f1Loading 1.5s infinite;
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+  .hover\:scale-105:hover {
+    transform: scale(1.02);
   }
 
-  .border-neutral-800 {
-    border-color: #ffffff !important;
+  .hover\:border-\[\#00D2BE\]:hover {
+    border-color: #00d2be;
   }
 
-  .text-neutral-400 {
-    color: #ffffff !important;
+  .group:hover .group-hover\:text-\[\#00D2BE\] {
+    color: #00d2be;
+  }
+}
+
+/* Enhanced mobile focus states */
+@media (max-width: 767px) {
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid #00d2be;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(0, 210, 190, 0.3);
   }
 }
 
@@ -871,122 +799,53 @@ select {
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
+    --telemetry-opacity: 0.08;
+    --scroll-intensity: 0.15;
   }
 }
 
-/* Reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+/* Reduced data mode */
+@media (prefers-reduced-data: reduce) {
+  body::before,
+  body::after {
+    background: linear-gradient(135deg, #0a0a0a 0%, #0d0d0d 50%, #0a0a0a 100%);
+    animation: none;
   }
 
-  .animate-bounce,
+  .bg-grid::before {
+    background: none;
+  }
+
   .animate-pulse,
-  .animate-spin {
-    animation: none !important;
+  .animate-bounce,
+  .animate-f1-pulse {
+    animation: none;
   }
 }
 
-/* Container queries for responsive design */
-@container (min-width: 768px) {
-  .container-md\:text-lg {
-    font-size: 1.125rem;
-    line-height: 1.75rem;
+/* High performance mode */
+@media (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
+  .performance-mode {
+    --performance-level: 1.5;
+    --telemetry-opacity: 0.1;
+    --scroll-intensity: 0.2;
   }
 }
 
-/* Content visibility optimizations */
-.content-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 500px;
+html {
+  scroll-behavior: auto; /* Changed from smooth to auto for faster scrolling */
+  scroll-padding-top: 80px;
+  /* Enable hardware acceleration */
+  transform: translateZ(0);
 }
 
-/* Intersection observer optimizations */
-.lazy-load {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-}
-
-.lazy-load.loaded {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Enhanced scrollbar for better UX */
-::-webkit-scrollbar {
-  width: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 50%, #1a1a1a 100%);
-  border-radius: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #00d2be 0%, #00a896 50%, #007a6b 100%);
-  border-radius: 6px;
-  border: 2px solid #1a1a1a;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #00f5e4 0%, #00d2be 50%, #00a896 100%);
-  box-shadow: 0 0 10px rgba(0, 210, 190, 0.3);
-}
-
-/* Selection styling */
-::selection {
-  background-color: #00d2be;
-  color: #000000;
-}
-
-::-moz-selection {
-  background-color: #00d2be;
-  color: #000000;
-}
-
-/* Prevent animation conflicts */
-.hero-section * {
+body {
+  background-color: #0a0a0a;
+  /* Optimize font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Enable GPU acceleration */
+  transform: translateZ(0);
   backface-visibility: hidden;
-  perspective: 1000px;
-}
-
-/* Ensure smooth animations */
-.gsap-animation {
-  will-change: transform, opacity;
-}
-
-/* Prevent layout shifts during animations */
-.hero-container {
-  contain: layout style paint;
-}
-
-/* Optimize animation performance */
-@media (prefers-reduced-motion: no-preference) {
-  .animate-on-scroll {
-    transform: translateZ(0);
-  }
-}
-
-/* Fix for Safari animation issues */
-@supports (-webkit-backdrop-filter: blur(10px)) {
-  .backdrop-blur-sm {
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-  }
-}
-
-/* Prevent double animations */
-.animation-complete {
-  animation: none !important;
-}
-
-/* Memory optimization */
-.will-change-auto {
-  will-change: auto;
 }

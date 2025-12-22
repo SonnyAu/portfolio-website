@@ -184,7 +184,11 @@ export default function HeroSection() {
   const handleScrollClick = () => {
     const aboutSection = document.getElementById("about")
     if (aboutSection) {
-      aboutSection.scrollIntoView({ behavior: "smooth" })
+      // Use faster scroll with less smooth behavior
+      aboutSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
     }
   }
 

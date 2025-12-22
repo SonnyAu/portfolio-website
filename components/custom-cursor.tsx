@@ -63,33 +63,89 @@ export default function CustomCursor() {
       const follower = followerRef.current
       if (!cursor || !follower) return
 
-      gsap.set(cursor, { xPercent: -50, yPercent: -50 })
-      gsap.set(follower, { xPercent: -50, yPercent: -50 })
+      // Set initial position to center the cursor properly
+      gsap.set(cursor, {
+        xPercent: -50,
+        yPercent: -50,
+        x: 0,
+        y: 0,
+      })
+      gsap.set(follower, {
+        xPercent: -50,
+        yPercent: -50,
+        x: 0,
+        y: 0,
+      })
+
+      let mouseX = 0
+      let mouseY = 0
 
       const onMouseMove = (e: MouseEvent) => {
-        gsap.to(cursor, { duration: 0.1, x: e.clientX, y: e.clientY })
-        gsap.to(follower, { duration: 0.6, x: e.clientX, y: e.clientY, ease: "expo.out" })
+        mouseX = e.clientX
+        mouseY = e.clientY
+
+        // Update cursor position immediately for precise tracking
+        gsap.to(cursor, {
+          duration: 0.05,
+          x: mouseX,
+          y: mouseY,
+          ease: "none",
+        })
+
+        // Follower with slight delay for smooth trailing effect
+        gsap.to(follower, {
+          duration: 0.3,
+          x: mouseX,
+          y: mouseY,
+          ease: "power2.out",
+        })
       }
 
       const onMouseEnter = () => {
-        gsap.to(follower, { scale: 1.5, duration: 0.3 })
-        gsap.to(cursor, { scale: 1.5, duration: 0.3 })
+        gsap.to(follower, { scale: 1.5, duration: 0.3, ease: "power2.out" })
+        gsap.to(cursor, { scale: 1.5, duration: 0.3, ease: "power2.out" })
       }
 
       const onMouseLeave = () => {
-        gsap.to(follower, { scale: 1, duration: 0.3 })
-        gsap.to(cursor, { scale: 1, duration: 0.3 })
+        gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
+        gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
       }
 
+      // Hide cursor when mouse leaves window
+      const onMouseEnterWindow = () => {
+        gsap.to([cursor, follower], { opacity: 1, duration: 0.2 })
+      }
+
+      const onMouseLeaveWindow = () => {
+        gsap.to([cursor, follower], { opacity: 0, duration: 0.2 })
+      }
+
+      // Event listeners
       window.addEventListener("mousemove", onMouseMove)
-      document.querySelectorAll("button, a, input, [role='button']").forEach((el) => {
+      document.addEventListener("mouseenter", onMouseEnterWindow)
+      document.addEventListener("mouseleave", onMouseLeaveWindow)
+
+      // Interactive elements
+      const interactiveElements = document.querySelectorAll("button, a, input, [role='button'], .project-card")
+      interactiveElements.forEach((el) => {
         el.addEventListener("mouseenter", onMouseEnter)
         el.addEventListener("mouseleave", onMouseLeave)
       })
 
+      // Set initial mouse position
+      const setInitialPosition = () => {
+        gsap.set([cursor, follower], { x: mouseX, y: mouseY })
+      }
+
+      // Small delay to ensure proper initialization
+      setTimeout(setInitialPosition, 50)
+
       return () => {
         window.removeEventListener("mousemove", onMouseMove)
-        document.querySelectorAll("button, a, input, [role='button']").forEach((el) => {
+        document.removeEventListener("mouseenter", onMouseEnterWindow)
+        document.removeEventListener("mouseleave", onMouseLeaveWindow)
+
+        interactiveElements.forEach((el) => {
           el.removeEventListener("mouseenter", onMouseEnter)
           el.removeEventListener("mouseleave", onMouseLeave)
         })
@@ -104,10 +160,21 @@ export default function CustomCursor() {
 
   return (
     <>
-      <div ref={cursorRef} className="fixed top-0 left-0 w-2 h-2 bg-[#00D2BE] rounded-full pointer-events-none z-50" />
+      <div
+        ref={cursorRef}
+        className="fixed top-0 left-0 w-2 h-2 bg-[#00D2BE] rounded-full pointer-events-none z-50"
+        style={{
+          mixBlendMode: "difference",
+          willChange: "transform",
+        }}
+      />
       <div
         ref={followerRef}
-        className="fixed top-0 left-0 w-8 h-8 border-2 border-[#00D2BE] rounded-full pointer-events-none z-50 mix-blend-difference"
+        className="fixed top-0 left-0 w-8 h-8 border-2 border-[#00D2BE] rounded-full pointer-events-none z-50"
+        style={{
+          mixBlendMode: "difference",
+          willChange: "transform",
+        }}
       />
     </>
   )

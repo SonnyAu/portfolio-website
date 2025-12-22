@@ -1,0 +1,27 @@
+{
+  "name": "Sonny Au - Software Engineer Portfolio",
+  "short_name": "Sonny Au Portfolio",
+  "description": "President's Scholar at SJSU specializing in full-stack development, React Native mobile apps, and machine learning.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#00D2BE",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["portfolio", "technology", "developer"],
+  "lang": "en-US",
+  "dir": "ltr"
+}
