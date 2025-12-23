@@ -1,13 +1,17 @@
 "use client"
 
-import { useEffect, useRef, Suspense, lazy } from "react"
+import { useEffect, useRef, useState, Suspense, lazy, useMemo } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { TextPlugin } from "gsap/TextPlugin"
 import dynamic from "next/dynamic"
 
+// Loading system must be client-only to avoid SSR hydration issues
+const AdvancedLoadingSystem = dynamic(() => import("@/components/advanced-loading-system"), {
+  ssr: false,
+})
+
 // Critical components loaded immediately with enhanced loading
-const AdvancedLoadingSystem = lazy(() => import("@/components/advanced-loading-system"))
 const Header = lazy(() => import("@/components/header"))
 const EnhancedHeroSection = lazy(() => import("@/components/enhanced-hero-section"))
 const AboutSection = lazy(() => import("@/components/about-section"))
@@ -50,25 +54,52 @@ const MinimalFallback = () => null
 
 export default function EnhancedF1Portfolio() {
   const mainContentRef = useRef<HTMLDivElement>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    // Enhanced performance optimization checks
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2
-    const isSlowConnection = navigator.connection && (navigator.connection as any).effectiveType === "slow-2g"
+    setIsMounted(true)
+  }, [])
+
+  // Memoize performance checks to avoid recalculating
+  const performanceSettings = useMemo(() => {
+    if (typeof window === "undefined") return { prefersReducedMotion: false, isLowEndDevice: false, isSlowConnection: false }
+    
+    return {
+      prefersReducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      isLowEndDevice: navigator.hardwareConcurrency ? navigator.hardwareConcurrency <= 2 : false,
+      isSlowConnection: navigator.connection ? (navigator.connection as any).effectiveType === "slow-2g" : false,
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted) return
+
+    const { prefersReducedMotion, isLowEndDevice, isSlowConnection } = performanceSettings
+
+    // Clear any GSAP styles that might have been applied during SSR (optimized scope)
+    if (mainContentRef.current && !prefersReducedMotion && !isLowEndDevice) {
+      const animatedElements = mainContentRef.current.querySelectorAll(".section *")
+      if (animatedElements.length > 0) {
+        gsap.set(animatedElements, { 
+          clearProps: "transform,opacity,filter,scale,translate,rotate" 
+        })
+      }
+    }
 
     if (prefersReducedMotion || isLowEndDevice || isSlowConnection) {
       gsap.globalTimeline.clear()
-      gsap.set("*", { clearProps: "all" })
+      return
     }
 
-    // Initially hide main content with enhanced styling
-    gsap.set(mainContentRef.current, {
-      opacity: 0,
-      visibility: "hidden",
-      filter: "blur(10px)",
-      scale: 0.98,
-    })
+    // Initially hide main content with enhanced styling (only on client)
+    if (mainContentRef.current) {
+      gsap.set(mainContentRef.current, {
+        opacity: 0,
+        visibility: "hidden",
+        filter: "blur(10px)",
+        scale: 0.98,
+      })
+    }
 
     // Enhanced preloader completion handler
     const handlePreloaderComplete = () => {
@@ -87,42 +118,47 @@ export default function EnhancedF1Portfolio() {
           document.body.style.cursor = "default"
           window.scrollTo(0, 0)
 
-          if (!prefersReducedMotion && !isLowEndDevice) {
+          if (!prefersReducedMotion && !isLowEndDevice && isMounted) {
             // Enhanced section animations with F1 timing
-            gsap.utils.toArray<HTMLElement>(".section").forEach((section, index) => {
-              const elements = Array.from(section.children)
+            // Small delay to ensure DOM is ready after hydration
+            setTimeout(() => {
+              gsap.utils.toArray<HTMLElement>(".section").forEach((section, index) => {
+                const elements = Array.from(section.children)
 
-              gsap.killTweensOf(elements)
+                // Clear any existing GSAP styles first
+                gsap.killTweensOf(elements)
+                gsap.set(elements, { clearProps: "transform,opacity,scale,translate,rotate" })
 
-              gsap.fromTo(
-                elements,
-                {
-                  y: 80,
-                  opacity: 0,
-                  scale: 0.95,
-                  rotationX: 10,
-                },
-                {
-                  y: 0,
-                  opacity: 1,
-                  scale: 1,
-                  rotationX: 0,
-                  stagger: 0.15,
-                  duration: 1.2,
-                  ease: "back.out(1.4)",
-                  scrollTrigger: {
-                    trigger: section,
-                    start: "top 85%",
-                    end: "top 15%",
-                    toggleActions: "play none none none",
-                    id: `section-${index}`,
-                    onComplete: () => {
-                      ScrollTrigger.getById(`section-${index}`)?.kill()
+                gsap.fromTo(
+                  elements,
+                  {
+                    y: 80,
+                    opacity: 0,
+                    scale: 0.95,
+                    rotationX: 10,
+                  },
+                  {
+                    y: 0,
+                    opacity: 1,
+                    scale: 1,
+                    rotationX: 0,
+                    stagger: 0.15,
+                    duration: 1.2,
+                    ease: "back.out(1.4)",
+                    scrollTrigger: {
+                      trigger: section,
+                      start: "top 85%",
+                      end: "top 15%",
+                      toggleActions: "play none none none",
+                      id: `section-${index}`,
+                      onComplete: () => {
+                        ScrollTrigger.getById(`section-${index}`)?.kill()
+                      },
                     },
                   },
-                },
-              )
-            })
+                )
+              })
+            }, 100)
 
             // Enhanced parallax effects with F1 telemetry feel
             gsap.utils.toArray<HTMLElement>(".parallax-slow").forEach((element, index) => {
@@ -146,17 +182,23 @@ export default function EnhancedF1Portfolio() {
               autoRefreshEvents: "visibilitychange,DOMContentLoaded,load",
             })
 
-            // Enhanced scroll-based animations
+            // Enhanced scroll-based animations (throttled for performance)
+            let scrollUpdateRaf: number | null = null
             ScrollTrigger.create({
               trigger: "body",
               start: "top top",
               end: "bottom bottom",
               scrub: 1,
               onUpdate: (self) => {
-                const progress = self.progress
-
-                // Dynamic background intensity based on scroll
-                document.documentElement.style.setProperty("--scroll-intensity", `${0.1 + progress * 0.3}`)
+                // Throttle updates using requestAnimationFrame
+                if (scrollUpdateRaf === null) {
+                  scrollUpdateRaf = requestAnimationFrame(() => {
+                    const progress = self.progress
+                    // Dynamic background intensity based on scroll
+                    document.documentElement.style.setProperty("--scroll-intensity", `${0.1 + progress * 0.3}`)
+                    scrollUpdateRaf = null
+                  })
+                }
               },
             })
           }
@@ -166,7 +208,7 @@ export default function EnhancedF1Portfolio() {
 
     window.addEventListener("preloaderComplete", handlePreloaderComplete)
 
-    // Enhanced cleanup function
+    // Cleanup function
     return () => {
       window.removeEventListener("preloaderComplete", handlePreloaderComplete)
       ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
@@ -175,13 +217,11 @@ export default function EnhancedF1Portfolio() {
       // Reset CSS custom properties
       document.documentElement.style.removeProperty("--scroll-intensity")
     }
-  }, [])
+  }, [isMounted, performanceSettings])
 
   return (
     <>
-      <Suspense fallback={<LoadingFallback />}>
-        <AdvancedLoadingSystem />
-      </Suspense>
+      <AdvancedLoadingSystem />
 
       <div
         ref={mainContentRef}

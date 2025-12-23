@@ -95,6 +95,9 @@
     /* Faster scroll behavior */
     scroll-behavior: auto;
     scrollbar-gutter: stable;
+    /* Performance optimizations */
+    contain: layout style paint;
+    will-change: scroll-position;
   }
 
   /* Enhanced cursor hiding for desktop */

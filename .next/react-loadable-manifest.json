@@ -1,0 +1,80 @@
+{
+  "app\\page.tsx -> @/components/about-section": {
+    "id": "app\\page.tsx -> @/components/about-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_about-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/advanced-loading-system": {
+    "id": "app\\page.tsx -> @/components/advanced-loading-system",
+    "files": [
+      "static/chunks/_app-pages-browser_components_advanced-loading-system_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/contact-section": {
+    "id": "app\\page.tsx -> @/components/contact-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_contact-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/custom-cursor": {
+    "id": "app\\page.tsx -> @/components/custom-cursor",
+    "files": [
+      "static/chunks/_app-pages-browser_components_custom-cursor_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/enhanced-hero-section": {
+    "id": "app\\page.tsx -> @/components/enhanced-hero-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_enhanced-hero-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/experience-section": {
+    "id": "app\\page.tsx -> @/components/experience-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_experience-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/f1-telemetry-background": {
+    "id": "app\\page.tsx -> @/components/f1-telemetry-background",
+    "files": [
+      "static/chunks/_app-pages-browser_components_f1-telemetry-background_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/header": {
+    "id": "app\\page.tsx -> @/components/header",
+    "files": [
+      "static/chunks/_app-pages-browser_components_header_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/performance-monitor": {
+    "id": "app\\page.tsx -> @/components/performance-monitor",
+    "files": [
+      "static/chunks/_app-pages-browser_components_performance-monitor_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/projects-section": {
+    "id": "app\\page.tsx -> @/components/projects-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_projects-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/skills-section": {
+    "id": "app\\page.tsx -> @/components/skills-section",
+    "files": [
+      "static/chunks/_app-pages-browser_components_skills-section_tsx.js"
+    ]
+  },
+  "app\\page.tsx -> @/components/speed-lines": {
+    "id": "app\\page.tsx -> @/components/speed-lines",
+    "files": [
+      "static/chunks/_app-pages-browser_components_speed-lines_tsx.js"
+    ]
+  },
+  "node_modules\\next\\dist\\client\\components\\react-dev-overlay\\utils\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
+    "id": "node_modules\\next\\dist\\client\\components\\react-dev-overlay\\utils\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_next_dist_client_dev_noop-turbopack-hmr_js.js"
+    ]
+  }
+}

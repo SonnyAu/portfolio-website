@@ -33,23 +33,50 @@ export default function EnhancedHeroSection() {
 
   useEffect(() => {
     checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
+    
+    // Throttle resize handler for performance
+    let ticking = false
+    const handleResize = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          checkMobile()
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+    
+    window.addEventListener("resize", handleResize, { passive: true })
+    return () => window.removeEventListener("resize", handleResize)
   }, [checkMobile])
 
-  // Simulate F1 telemetry data
+  // Simulate F1 telemetry data (throttled for performance)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTelemetryData((prev) => ({
-        speed: Math.min(prev.speed + Math.random() * 10 - 5, 320),
-        rpm: Math.min(prev.rpm + Math.random() * 500 - 250, 15000),
-        gear: Math.max(1, Math.min(8, prev.gear + (Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0))),
-        temp: Math.max(70, Math.min(110, prev.temp + Math.random() * 4 - 2)),
-        fuel: Math.max(0, prev.fuel - Math.random() * 0.1),
-      }))
-    }, 2000)
+    let lastUpdate = 0
+    const throttleMs = 100 // Update max every 100ms
+    let rafId: number | null = null
 
-    return () => clearInterval(interval)
+    const updateTelemetry = (timestamp: number) => {
+      if (timestamp - lastUpdate >= throttleMs) {
+        setTelemetryData((prev) => ({
+          speed: Math.min(prev.speed + Math.random() * 10 - 5, 320),
+          rpm: Math.min(prev.rpm + Math.random() * 500 - 250, 15000),
+          gear: Math.max(1, Math.min(8, prev.gear + (Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0))),
+          temp: Math.max(70, Math.min(110, prev.temp + Math.random() * 4 - 2)),
+          fuel: Math.max(0, prev.fuel - Math.random() * 0.1),
+        }))
+        lastUpdate = timestamp
+      }
+      rafId = requestAnimationFrame(updateTelemetry)
+    }
+
+    rafId = requestAnimationFrame(updateTelemetry)
+
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
+    }
   }, [])
 
   useEffect(() => {

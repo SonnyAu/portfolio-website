@@ -79,26 +79,38 @@ export default function CustomCursor() {
 
       let mouseX = 0
       let mouseY = 0
+      let rafId: number | null = null
+      let needsUpdate = false
 
       const onMouseMove = (e: MouseEvent) => {
         mouseX = e.clientX
         mouseY = e.clientY
+        needsUpdate = true
 
-        // Update cursor position immediately for precise tracking
-        gsap.to(cursor, {
-          duration: 0.05,
-          x: mouseX,
-          y: mouseY,
-          ease: "none",
-        })
+        // Use requestAnimationFrame for better performance
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            if (needsUpdate && cursor && follower) {
+              // Update cursor position immediately for precise tracking
+              gsap.to(cursor, {
+                duration: 0.05,
+                x: mouseX,
+                y: mouseY,
+                ease: "none",
+              })
 
-        // Follower with slight delay for smooth trailing effect
-        gsap.to(follower, {
-          duration: 0.3,
-          x: mouseX,
-          y: mouseY,
-          ease: "power2.out",
-        })
+              // Follower with slight delay for smooth trailing effect
+              gsap.to(follower, {
+                duration: 0.3,
+                x: mouseX,
+                y: mouseY,
+                ease: "power2.out",
+              })
+              needsUpdate = false
+              rafId = null
+            }
+          })
+        }
       }
 
       const onMouseEnter = () => {
@@ -120,17 +132,28 @@ export default function CustomCursor() {
         gsap.to([cursor, follower], { opacity: 0, duration: 0.2 })
       }
 
-      // Event listeners
-      window.addEventListener("mousemove", onMouseMove)
+      // Event listeners (passive for better performance)
+      window.addEventListener("mousemove", onMouseMove, { passive: true })
       document.addEventListener("mouseenter", onMouseEnterWindow)
       document.addEventListener("mouseleave", onMouseLeaveWindow)
 
-      // Interactive elements
-      const interactiveElements = document.querySelectorAll("button, a, input, [role='button'], .project-card")
-      interactiveElements.forEach((el) => {
-        el.addEventListener("mouseenter", onMouseEnter)
-        el.addEventListener("mouseleave", onMouseLeave)
-      })
+      // Interactive elements (use delegation for better performance)
+      const handleInteractiveEnter = (e: Event) => {
+        const target = e.target as HTMLElement
+        if (target.matches("button, a, input, [role='button'], .project-card")) {
+          onMouseEnter()
+        }
+      }
+      
+      const handleInteractiveLeave = (e: Event) => {
+        const target = e.target as HTMLElement
+        if (target.matches("button, a, input, [role='button'], .project-card")) {
+          onMouseLeave()
+        }
+      }
+
+      document.addEventListener("mouseenter", handleInteractiveEnter, true)
+      document.addEventListener("mouseleave", handleInteractiveLeave, true)
 
       // Set initial mouse position
       const setInitialPosition = () => {
@@ -141,14 +164,14 @@ export default function CustomCursor() {
       setTimeout(setInitialPosition, 50)
 
       return () => {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId)
+        }
         window.removeEventListener("mousemove", onMouseMove)
         document.removeEventListener("mouseenter", onMouseEnterWindow)
         document.removeEventListener("mouseleave", onMouseLeaveWindow)
-
-        interactiveElements.forEach((el) => {
-          el.removeEventListener("mouseenter", onMouseEnter)
-          el.removeEventListener("mouseleave", onMouseLeave)
-        })
+        document.removeEventListener("mouseenter", handleInteractiveEnter, true)
+        document.removeEventListener("mouseleave", handleInteractiveLeave, true)
       }
     }
   }, [isMobile])

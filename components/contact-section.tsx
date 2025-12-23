@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { gsap } from "gsap"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,26 +34,32 @@ export default function ContactSection() {
   const successRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!formRef.current) return
+
     // Animate form elements on scroll
-    gsap.fromTo(
-      formRef.current?.children,
-      { y: 50, opacity: 0 },
-      {
-        y: 0,
-        opacity: 1,
-        stagger: 0.1,
-        duration: 0.8,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: formRef.current,
-          start: "top 80%",
-          toggleActions: "play none none none",
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        formRef.current?.children,
+        { y: 50, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          stagger: 0.1,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: formRef.current,
+            start: "top 80%",
+            toggleActions: "play none none none",
+          },
         },
-      },
-    )
+      )
+    })
+
+    return () => ctx.revert()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
@@ -61,8 +67,10 @@ export default function ContactSection() {
     await new Promise((resolve) => setTimeout(resolve, 2500))
 
     // Show success animation
-    gsap.to(formRef.current, { opacity: 0, y: -20, duration: 0.5 })
-    gsap.to(successRef.current, { opacity: 1, y: 0, duration: 0.5, delay: 0.3 })
+    if (formRef.current && successRef.current) {
+      gsap.to(formRef.current, { opacity: 0, y: -20, duration: 0.5 })
+      gsap.to(successRef.current, { opacity: 1, y: 0, duration: 0.5, delay: 0.3 })
+    }
 
     setIsSubmitting(false)
     setEmailSent(true)
@@ -71,17 +79,19 @@ export default function ContactSection() {
     setTimeout(() => {
       setEmailSent(false)
       setFormData({ name: "", email: "", subject: "", message: "" })
-      gsap.to(formRef.current, { opacity: 1, y: 0, duration: 0.5 })
-      gsap.to(successRef.current, { opacity: 0, y: 4, duration: 0.3 })
+      if (formRef.current && successRef.current) {
+        gsap.to(formRef.current, { opacity: 1, y: 0, duration: 0.5 })
+        gsap.to(successRef.current, { opacity: 0, y: 4, duration: 0.3 })
+      }
     }, 5000)
-  }
+  }, [])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    })
-  }
+    }))
+  }, [])
 
   return (
     <section id="contact" className="section container mx-auto py-12 md:py-32 px-2 md:px-4 relative">
@@ -308,17 +318,6 @@ export default function ContactSection() {
                   </div>
                 )}
               </Button>
-
-              {/* Email Tips */}
-              <div className="bg-[#0f0f0f] border border-neutral-800 rounded-lg p-2 md:p-4">
-                <div className="text-xs font-f1-bold text-[#00D2BE] mb-1 md:mb-2">💡 EMAIL TIPS</div>
-                <ul className="text-xs text-neutral-400 font-f1 space-y-0.5 md:space-y-1">
-                  <li>• Be specific about opportunities or projects</li>
-                  <li>• Include relevant details about timelines</li>
-                  <li>• I typically respond within 24-48 hours</li>
-                  <li className="hidden md:block">• For urgent matters, feel free to call: (408) 669-9299</li>
-                </ul>
-              </div>
             </form>
 
             {/* Success Message */}

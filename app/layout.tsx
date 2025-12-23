@@ -113,17 +113,10 @@ export const metadata: Metadata = {
       "🏆 President's Scholar at SJSU specializing in championship-level full-stack development, React Native mobile apps, and machine learning. Co-founder of PalAte with 1,000+ users achieving 900% performance improvements.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/placeholder.jpg", // TODO: Replace with actual og-image.jpg when created
         width: 1200,
         height: 630,
         alt: "Sonny Au - Elite Software Engineer Portfolio with F1-Inspired Design",
-        type: "image/jpeg",
-      },
-      {
-        url: "/og-image-square.jpg",
-        width: 1200,
-        height: 1200,
-        alt: "Sonny Au - Software Engineer",
         type: "image/jpeg",
       },
     ],
@@ -133,7 +126,7 @@ export const metadata: Metadata = {
     title: "Sonny Au - Elite Software Engineer | F1-Inspired Portfolio",
     description:
       "🏆 President's Scholar at SJSU | React Native & AI Specialist | Co-founder of PalAte | 900% Performance Improvements | Available for Elite Opportunities",
-    images: ["/og-image.jpg"],
+    images: ["/placeholder.jpg"], // TODO: Replace with actual og-image.jpg when created
     creator: "@sonnyau_dev",
     site: "@sonnyau_dev",
   },
@@ -302,8 +295,16 @@ export default function RootLayout({
           as="font"
           type="font/ttf"
           crossOrigin="anonymous"
+          fetchPriority="high"
         />
-        <link rel="preload" href="/fonts/Formula1-Bold_web_0.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
+        <link 
+          rel="preload" 
+          href="/fonts/Formula1-Bold_web_0.ttf" 
+          as="font" 
+          type="font/ttf" 
+          crossOrigin="anonymous"
+          fetchPriority="high"
+        />
 
         {/* Enhanced favicon and app icons */}
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -328,16 +329,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Sonny Au" />
 
         {/* Enhanced security headers */}
+        {/* Note: X-Frame-Options must be set via HTTP headers, not meta tags */}
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
-        <meta httpEquiv="X-Frame-Options" content="DENY" />
         <meta httpEquiv="X-XSS-Protection" content="1; mode=block" />
         <meta name="referrer" content="origin-when-cross-origin" />
 
         {/* Resource hints for better performance */}
-        <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" />
-
-        {/* Critical CSS inlining hint */}
-        <link rel="preload" href="/globals.css" as="style" />
+        {/* Note: og-image.jpg should be created in public/ folder */}
+        {/* <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" /> */}
       </head>
       <body className={`${inter.variable} antialiased`}>
         {children}

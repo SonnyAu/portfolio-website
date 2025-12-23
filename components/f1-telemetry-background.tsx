@@ -13,12 +13,21 @@ export default function F1TelemetryBackground() {
   const dataStreamRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Animate telemetry data streams
+    // Animate telemetry data streams (reduce on low-end devices)
     if (telemetryRef.current) {
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2
+      
+      if (prefersReducedMotion || isLowEndDevice) return
+
       const paths = telemetryRef.current.querySelectorAll("path")
       const circles = telemetryRef.current.querySelectorAll("circle")
 
-      paths.forEach((path, index) => {
+      // Limit animations for performance
+      const maxPaths = isLowEndDevice ? 3 : paths.length
+      const maxCircles = isLowEndDevice ? 5 : circles.length
+
+      Array.from(paths).slice(0, maxPaths).forEach((path, index) => {
         gsap.fromTo(
           path,
           { strokeDasharray: "0 2000" },
@@ -32,7 +41,7 @@ export default function F1TelemetryBackground() {
         )
       })
 
-      circles.forEach((circle, index) => {
+      Array.from(circles).slice(0, maxCircles).forEach((circle, index) => {
         gsap.to(circle, {
           opacity: gsap.utils.random(0.2, 0.8),
           scale: gsap.utils.random(0.8, 1.2),
@@ -45,43 +54,48 @@ export default function F1TelemetryBackground() {
       })
     }
 
-    // Scroll-triggered brake disc effects
-    const sections = document.querySelectorAll(".section")
-    sections.forEach((section, index) => {
-      ScrollTrigger.create({
-        trigger: section,
-        start: "top 80%",
-        end: "bottom 20%",
-        onEnter: () => {
-          // Trigger brake glow effect
-          if (brakeDiscsRef.current) {
-            const brakeDisc = brakeDiscsRef.current.children[index % 4]
-            if (brakeDisc) {
-              gsap.to(brakeDisc, {
-                boxShadow: "0 0 40px rgba(255, 100, 100, 0.4), 0 0 80px rgba(255, 100, 100, 0.2)",
-                duration: 0.8,
-                ease: "power2.out",
-                yoyo: true,
-                repeat: 1,
-              })
+    // Scroll-triggered brake disc effects (optimized - only on desktop)
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2
+    
+    if (!prefersReducedMotion && !isLowEndDevice) {
+      const sections = document.querySelectorAll(".section")
+      sections.forEach((section, index) => {
+        ScrollTrigger.create({
+          trigger: section,
+          start: "top 80%",
+          end: "bottom 20%",
+          onEnter: () => {
+            // Trigger brake glow effect
+            if (brakeDiscsRef.current) {
+              const brakeDisc = brakeDiscsRef.current.children[index % 4]
+              if (brakeDisc) {
+                gsap.to(brakeDisc, {
+                  boxShadow: "0 0 40px rgba(255, 100, 100, 0.4), 0 0 80px rgba(255, 100, 100, 0.2)",
+                  duration: 0.8,
+                  ease: "power2.out",
+                  yoyo: true,
+                  repeat: 1,
+                })
+              }
             }
-          }
-        },
-        onLeave: () => {
-          // Fade brake glow
-          if (brakeDiscsRef.current) {
-            const brakeDisc = brakeDiscsRef.current.children[index % 4]
-            if (brakeDisc) {
-              gsap.to(brakeDisc, {
-                boxShadow: "0 0 0 rgba(255, 100, 100, 0)",
-                duration: 1,
-                ease: "power2.out",
-              })
+          },
+          onLeave: () => {
+            // Fade brake glow
+            if (brakeDiscsRef.current) {
+              const brakeDisc = brakeDiscsRef.current.children[index % 4]
+              if (brakeDisc) {
+                gsap.to(brakeDisc, {
+                  boxShadow: "0 0 0 rgba(255, 100, 100, 0)",
+                  duration: 1,
+                  ease: "power2.out",
+                })
+              }
             }
-          }
-        },
+          },
+        })
       })
-    })
+    }
 
     // Data stream particles
     const createDataParticles = () => {

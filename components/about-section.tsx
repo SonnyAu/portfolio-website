@@ -1,35 +1,64 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import Image from "next/image"
 import { GraduationCap, Users, Code } from "lucide-react"
 
 export default function AboutSection() {
+  const [isMounted, setIsMounted] = useState(false)
   const imageRef = useRef<HTMLDivElement>(null)
   const achievementsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Image hover effect
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted) return
+
+    const imageElement = imageRef.current
+    if (!imageElement) return
+
+    // Image hover effect (only on desktop, throttled)
+    const isDesktop = window.innerWidth >= 768
+    if (!isDesktop) return
+
+    let rafId: number | null = null
+    
     const handleMouseEnter = () => {
-      gsap.to(imageRef.current, { scale: 1.05, duration: 0.3, ease: "power2.out" })
+      if (rafId === null && imageRef.current) {
+        rafId = requestAnimationFrame(() => {
+          if (imageRef.current) {
+            gsap.to(imageRef.current, { scale: 1.05, duration: 0.3, ease: "power2.out" })
+          }
+          rafId = null
+        })
+      }
     }
 
     const handleMouseLeave = () => {
-      gsap.to(imageRef.current, { scale: 1, duration: 0.3, ease: "power2.out" })
-    }
-
-    const imageElement = imageRef.current
-    if (imageElement) {
-      imageElement.addEventListener("mouseenter", handleMouseEnter)
-      imageElement.addEventListener("mouseleave", handleMouseLeave)
-
-      return () => {
-        imageElement.removeEventListener("mouseenter", handleMouseEnter)
-        imageElement.removeEventListener("mouseleave", handleMouseLeave)
+      if (rafId === null && imageRef.current) {
+        rafId = requestAnimationFrame(() => {
+          if (imageRef.current) {
+            gsap.to(imageRef.current, { scale: 1, duration: 0.3, ease: "power2.out" })
+          }
+          rafId = null
+        })
       }
     }
-  }, [])
+
+    imageElement.addEventListener("mouseenter", handleMouseEnter)
+    imageElement.addEventListener("mouseleave", handleMouseLeave)
+
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
+      imageElement.removeEventListener("mouseenter", handleMouseEnter)
+      imageElement.removeEventListener("mouseleave", handleMouseLeave)
+    }
+  }, [isMounted])
 
   return (
     <section id="about" className="section container mx-auto py-12 md:py-32 px-2 md:px-4 relative">
@@ -104,6 +133,9 @@ export default function AboutSection() {
         <div className="md:col-span-1 relative">
           <div ref={imageRef} className="relative h-64 md:h-96 lg:h-[420px] overflow-hidden rounded-lg">
             <Image
+              loading="lazy"
+              quality={85}
+              sizes="(max-width: 768px) 100vw, 33vw"
               src="/placeholder.svg?width=400&height=500"
               alt="Sonny Au - Software Engineer"
               fill
