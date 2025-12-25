@@ -10,7 +10,6 @@ interface LoadingSystemProps {
 export default function AdvancedLoadingSystem({
   onComplete,
 }: LoadingSystemProps) {
-  const [isMounted, setIsMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lightsRef = useRef<(HTMLDivElement | null)[]>([]);
   const textRef = useRef<HTMLDivElement>(null);
@@ -28,11 +27,6 @@ export default function AdvancedLoadingSystem({
     temp: 20,
     fuel: 100,
   });
-
-  // Ensure component only renders on client
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const preloadCriticalResources = useCallback(async () => {
     const criticalResources = [
@@ -92,8 +86,8 @@ export default function AdvancedLoadingSystem({
         containerRef.current.style.zIndex = "9999";
       }
 
-      // Small delay to ensure DOM is ready and refs are attached
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Use requestAnimationFrame once to ensure DOM is ready, but start animation immediately
+      await new Promise((resolve) => requestAnimationFrame(resolve));
 
       // F1 Loading sequence with realistic telemetry
       const loadingSteps = [
@@ -175,15 +169,6 @@ export default function AdvancedLoadingSystem({
       }, 200);
 
       const preloadPromise = preloadCriticalResources();
-
-      // Ensure container is visible immediately
-      if (containerRef.current) {
-        gsap.set(containerRef.current, {
-          opacity: 1,
-          visibility: "visible",
-          display: "flex",
-        });
-      }
 
       // Initialize all refs before starting animations
       if (progressBarRef.current) {
@@ -364,11 +349,6 @@ export default function AdvancedLoadingSystem({
       setLoadingText("SYSTEM INITIALIZATION");
     };
   }, [preloadCriticalResources, onComplete]);
-
-  // Don't render until mounted (client-side only)
-  if (!isMounted) {
-    return null;
-  }
 
   return (
     <div

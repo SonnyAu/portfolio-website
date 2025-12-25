@@ -9,6 +9,18 @@ import dynamic from "next/dynamic"
 // Loading system must be client-only to avoid SSR hydration issues
 const AdvancedLoadingSystem = dynamic(() => import("@/components/advanced-loading-system"), {
   ssr: false,
+  loading: () => (
+    <div
+      data-loading-system
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0a0a] overflow-hidden"
+      style={{ opacity: 1, visibility: "visible", display: "flex" }}
+    >
+      <div className="text-center">
+        <div className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3">F1/DEV PORTFOLIO</div>
+        <div className="text-sm md:text-lg text-neutral-400 font-f1">SYSTEM INITIALIZATION</div>
+      </div>
+    </div>
+  ),
 })
 
 // Critical components loaded immediately with enhanced loading
