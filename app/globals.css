@@ -852,3 +852,20 @@ body {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+
+/* Hide main content until loading completes - prevents flash of content */
+/* Only applies before preloader completes, then GSAP takes over */
+body:not(.preloader-complete) [data-main-content] {
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Ensure loading system is always visible initially */
+[data-loading-system] {
+  opacity: 1;
+  visibility: visible;
+  display: flex;
+  z-index: 9999;
+}

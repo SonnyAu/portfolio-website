@@ -149,9 +149,9 @@ export default function AdvancedLoadingSystem({
       ];
 
       // Simulate realistic F1 telemetry during loading (throttled for performance)
-      let lastTelemetryUpdate = 0
+      let lastTelemetryUpdate = 0;
       telemetryInterval = setInterval(() => {
-        const now = performance.now()
+        const now = performance.now();
         if (now - lastTelemetryUpdate >= 200) {
           setTelemetryData((prev) => ({
             rpm: Math.max(0, prev.rpm + (Math.random() - 0.5) * 1000),
@@ -169,8 +169,8 @@ export default function AdvancedLoadingSystem({
               Math.min(120, prev.temp + (Math.random() - 0.5) * 5)
             ),
             fuel: Math.max(0, prev.fuel - Math.random() * 0.5),
-          }))
-          lastTelemetryUpdate = now
+          }));
+          lastTelemetryUpdate = now;
         }
       }, 200);
 
@@ -331,6 +331,10 @@ export default function AdvancedLoadingSystem({
               timelineInstance.kill();
               if (animationId) cancelAnimationFrame(animationId);
               clearInterval(telemetryInterval);
+              // Mark body as preloader complete to allow main content to show
+              if (typeof document !== "undefined") {
+                document.body.classList.add("preloader-complete");
+              }
               onComplete?.();
               window.dispatchEvent(new CustomEvent("preloaderComplete"));
             }
@@ -369,8 +373,9 @@ export default function AdvancedLoadingSystem({
   return (
     <div
       ref={containerRef}
+      data-loading-system
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0a0a] overflow-hidden"
-      style={{ opacity: 1, visibility: "visible" }}
+      style={{ opacity: 1, visibility: "visible", display: "flex" }}
     >
       {/* Enhanced F1 atmosphere */}
       <div className="absolute inset-0 opacity-10">

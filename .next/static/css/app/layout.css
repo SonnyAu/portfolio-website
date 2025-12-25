@@ -2732,208 +2732,180 @@ body {
   backface-visibility: hidden;
 }
 
+/* Hide main content until loading completes - prevents flash of content */
+/* Only applies before preloader completes, then GSAP takes over */
+body:not(.preloader-complete) [data-main-content] {
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Ensure loading system is always visible initially */
+[data-loading-system] {
+  opacity: 1;
+  visibility: visible;
+  display: flex;
+  z-index: 9999;
+}
 .file\:border-0::file-selector-button {
   border-width: 0px;
 }
-
 .file\:bg-transparent::file-selector-button {
   background-color: transparent;
 }
-
 .file\:text-sm::file-selector-button {
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
-
 .file\:font-medium::file-selector-button {
   font-weight: 500;
 }
-
 .file\:text-foreground::file-selector-button {
   color: hsl(var(--foreground));
 }
-
 .placeholder\:text-muted-foreground::placeholder {
   color: hsl(var(--muted-foreground));
 }
-
 .hover\:scale-105:hover {
   --tw-scale-x: 1.05;
   --tw-scale-y: 1.05;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
-
 .hover\:border-\[\#00D2BE\]:hover {
   --tw-border-opacity: 1;
   border-color: rgb(0 210 190 / var(--tw-border-opacity, 1));
 }
-
 .hover\:border-neutral-700:hover {
   --tw-border-opacity: 1;
   border-color: rgb(64 64 64 / var(--tw-border-opacity, 1));
 }
-
 .hover\:bg-\[\#00A896\]:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(0 168 150 / var(--tw-bg-opacity, 1));
 }
-
 .hover\:bg-\[\#00D2BE\]:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(0 210 190 / var(--tw-bg-opacity, 1));
 }
-
 .hover\:bg-\[\#00D2BE\]\/30:hover {
   background-color: rgb(0 210 190 / 0.3);
 }
-
 .hover\:bg-accent:hover {
   background-color: hsl(var(--accent));
 }
-
 .hover\:bg-destructive\/90:hover {
   background-color: hsl(var(--destructive) / 0.9);
 }
-
 .hover\:bg-neutral-700:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(64 64 64 / var(--tw-bg-opacity, 1));
 }
-
 .hover\:bg-neutral-800:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(38 38 38 / var(--tw-bg-opacity, 1));
 }
-
 .hover\:bg-neutral-900\/30:hover {
   background-color: rgb(23 23 23 / 0.3);
 }
-
 .hover\:bg-primary\/90:hover {
   background-color: hsl(var(--primary) / 0.9);
 }
-
 .hover\:bg-secondary\/80:hover {
   background-color: hsl(var(--secondary) / 0.8);
 }
-
 .hover\:text-\[\#00D2BE\]:hover {
   --tw-text-opacity: 1;
   color: rgb(0 210 190 / var(--tw-text-opacity, 1));
 }
-
 .hover\:text-accent-foreground:hover {
   color: hsl(var(--accent-foreground));
 }
-
 .hover\:text-black:hover {
   --tw-text-opacity: 1;
   color: rgb(0 0 0 / var(--tw-text-opacity, 1));
 }
-
 .hover\:text-red-300:hover {
   --tw-text-opacity: 1;
   color: rgb(252 165 165 / var(--tw-text-opacity, 1));
 }
-
 .hover\:text-white:hover {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
-
 .hover\:underline:hover {
   text-decoration-line: underline;
 }
-
 .hover\:shadow-lg:hover {
   --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
-
 .hover\:shadow-\[\#00D2BE\]\/20:hover {
   --tw-shadow-color: rgb(0 210 190 / 0.2);
   --tw-shadow: var(--tw-shadow-colored);
 }
-
 .focus\:border-\[\#00D2BE\]:focus {
   --tw-border-opacity: 1;
   border-color: rgb(0 210 190 / var(--tw-border-opacity, 1));
 }
-
 .focus\:outline-none:focus {
   outline: 2px solid transparent;
   outline-offset: 2px;
 }
-
 .focus-visible\:outline-none:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
 }
-
 .focus-visible\:ring-2:focus-visible {
   --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
   --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
   box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
 }
-
 .focus-visible\:ring-ring:focus-visible {
   --tw-ring-color: hsl(var(--ring));
 }
-
 .focus-visible\:ring-offset-2:focus-visible {
   --tw-ring-offset-width: 2px;
 }
-
 .active\:scale-95:active {
   --tw-scale-x: .95;
   --tw-scale-y: .95;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
-
 .disabled\:pointer-events-none:disabled {
   pointer-events: none;
 }
-
 .disabled\:cursor-not-allowed:disabled {
   cursor: not-allowed;
 }
-
 .disabled\:opacity-50:disabled {
   opacity: 0.5;
 }
-
 .group:hover .group-hover\:w-full {
   width: 100%;
 }
-
 .group:hover .group-hover\:text-\[\#00D2BE\] {
   --tw-text-opacity: 1;
   color: rgb(0 210 190 / var(--tw-text-opacity, 1));
 }
-
 .group:hover .group-hover\:text-white {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
-
 .group:hover .group-hover\:opacity-100 {
   opacity: 1;
 }
-
 .group:hover .group-hover\:opacity-20 {
   opacity: 0.2;
 }
-
 .group:hover .group-hover\:opacity-30 {
   opacity: 0.3;
 }
-
 .group:hover .group-hover\:grayscale-0 {
   --tw-grayscale: grayscale(0);
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
 }
-
 @media (min-width: 640px) {
 
   .sm\:text-4xl {
@@ -2946,7 +2918,6 @@ body {
     line-height: 1.25rem;
   }
 }
-
 @media (min-width: 768px) {
 
   .md\:-right-4 {
@@ -3440,7 +3411,6 @@ body {
     line-height: 0.9;
   }
 }
-
 @media (min-width: 1024px) {
 
   .lg\:h-\[420px\] {
@@ -3467,7 +3437,6 @@ body {
     line-height: 1.75rem;
   }
 }
-
 @media (min-width: 1280px) {
 
   .xl\:text-8xl {
@@ -3475,7 +3444,6 @@ body {
     line-height: 1;
   }
 }
-
 @media (min-width: 1536px) {
 
   .\32xl\:text-9xl {
@@ -3483,16 +3451,13 @@ body {
     line-height: 1;
   }
 }
-
 .\[\&_svg\]\:pointer-events-none svg {
   pointer-events: none;
 }
-
 .\[\&_svg\]\:size-4 svg {
   width: 1rem;
   height: 1rem;
 }
-
 .\[\&_svg\]\:shrink-0 svg {
   flex-shrink: 0;
 }

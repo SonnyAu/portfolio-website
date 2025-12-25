@@ -103,6 +103,9 @@ export default function EnhancedF1Portfolio() {
 
     // Enhanced preloader completion handler
     const handlePreloaderComplete = () => {
+      // Mark body as preloader complete to remove CSS hiding
+      document.body.classList.add("preloader-complete")
+      
       // Clear any existing animations
       gsap.killTweensOf(mainContentRef.current)
 
@@ -225,6 +228,7 @@ export default function EnhancedF1Portfolio() {
 
       <div
         ref={mainContentRef}
+        data-main-content
         className="bg-[#0a0a0a] text-neutral-200 font-f1 overflow-x-hidden relative"
         style={{
           backgroundImage: `
