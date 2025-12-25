@@ -855,11 +855,20 @@ body {
 
 /* Hide main content until loading completes - prevents flash of content */
 /* Only applies before preloader completes, then GSAP takes over */
-body:not(.preloader-complete) [data-main-content] {
+body:not(.preloader-complete) [data-main-content],
+[data-main-content].main-content-hidden {
   opacity: 0;
   visibility: hidden;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* Show content after preloader completes */
+body.preloader-complete [data-main-content].main-content-hidden {
+  opacity: 1;
+  visibility: visible;
+  overflow: visible;
+  pointer-events: auto;
 }
 
 /* Ensure loading system is always visible initially */

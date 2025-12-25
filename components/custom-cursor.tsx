@@ -82,10 +82,27 @@ export default function CustomCursor() {
       let rafId: number | null = null
       let needsUpdate = false
 
+      let isHoveringInteractive = false
+
       const onMouseMove = (e: MouseEvent) => {
         mouseX = e.clientX
         mouseY = e.clientY
         needsUpdate = true
+
+        // Check if hovering over interactive element
+        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
+        if (elementAtPoint) {
+          const isInteractive = elementAtPoint.closest("button, a, input, [role='button'], .project-card") !== null
+          if (isInteractive && !isHoveringInteractive) {
+            isHoveringInteractive = true
+            gsap.to(follower, { scale: 1.5, duration: 0.3, ease: "power2.out" })
+            gsap.to(cursor, { scale: 1.5, duration: 0.3, ease: "power2.out" })
+          } else if (!isInteractive && isHoveringInteractive) {
+            isHoveringInteractive = false
+            gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
+            gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
+          }
+        }
 
         // Use requestAnimationFrame for better performance
         if (rafId === null) {
@@ -113,16 +130,6 @@ export default function CustomCursor() {
         }
       }
 
-      const onMouseEnter = () => {
-        gsap.to(follower, { scale: 1.5, duration: 0.3, ease: "power2.out" })
-        gsap.to(cursor, { scale: 1.5, duration: 0.3, ease: "power2.out" })
-      }
-
-      const onMouseLeave = () => {
-        gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
-        gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
-      }
-
       // Hide cursor when mouse leaves window
       const onMouseEnterWindow = () => {
         gsap.to([cursor, follower], { opacity: 1, duration: 0.2 })
@@ -130,30 +137,15 @@ export default function CustomCursor() {
 
       const onMouseLeaveWindow = () => {
         gsap.to([cursor, follower], { opacity: 0, duration: 0.2 })
+        isHoveringInteractive = false
+        gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
+        gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
       }
 
       // Event listeners (passive for better performance)
       window.addEventListener("mousemove", onMouseMove, { passive: true })
       document.addEventListener("mouseenter", onMouseEnterWindow)
       document.addEventListener("mouseleave", onMouseLeaveWindow)
-
-      // Interactive elements (use delegation for better performance)
-      const handleInteractiveEnter = (e: Event) => {
-        const target = e.target as HTMLElement
-        if (target.matches("button, a, input, [role='button'], .project-card")) {
-          onMouseEnter()
-        }
-      }
-      
-      const handleInteractiveLeave = (e: Event) => {
-        const target = e.target as HTMLElement
-        if (target.matches("button, a, input, [role='button'], .project-card")) {
-          onMouseLeave()
-        }
-      }
-
-      document.addEventListener("mouseenter", handleInteractiveEnter, true)
-      document.addEventListener("mouseleave", handleInteractiveLeave, true)
 
       // Set initial mouse position
       const setInitialPosition = () => {
@@ -170,8 +162,6 @@ export default function CustomCursor() {
         window.removeEventListener("mousemove", onMouseMove)
         document.removeEventListener("mouseenter", onMouseEnterWindow)
         document.removeEventListener("mouseleave", onMouseLeaveWindow)
-        document.removeEventListener("mouseenter", handleInteractiveEnter, true)
-        document.removeEventListener("mouseleave", handleInteractiveLeave, true)
       }
     }
   }, [isMobile])

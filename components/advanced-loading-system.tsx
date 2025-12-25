@@ -86,8 +86,32 @@ export default function AdvancedLoadingSystem({
         containerRef.current.style.zIndex = "9999";
       }
 
-      // Use requestAnimationFrame once to ensure DOM is ready, but start animation immediately
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Use requestAnimationFrame multiple times to ensure DOM is fully ready
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+
+      // Wait for all critical refs to be attached to the DOM with retry logic
+      let retries = 0;
+      const maxRetries = 20; // Increased retries for reliability
+      while (
+        (!progressBarRef.current ||
+          !rpmNeedleRef.current ||
+          !speedNeedleRef.current) &&
+        retries < maxRetries
+      ) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        retries++;
+      }
+
+      // Final check - if refs still aren't ready, wait one more frame
+      if (
+        !progressBarRef.current ||
+        !rpmNeedleRef.current ||
+        !speedNeedleRef.current
+      ) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
 
       // F1 Loading sequence with realistic telemetry
       const loadingSteps = [
@@ -170,80 +194,134 @@ export default function AdvancedLoadingSystem({
 
       const preloadPromise = preloadCriticalResources();
 
-      // Initialize all refs before starting animations
-      if (progressBarRef.current) {
-        gsap.set(progressBarRef.current, { width: "0%" });
+      // Initialize all refs before starting animations - ensure they exist
+      if (
+        !progressBarRef.current ||
+        !rpmNeedleRef.current ||
+        !speedNeedleRef.current
+      ) {
+        console.warn(
+          "Loading system refs not ready, skipping animation initialization"
+        );
+        return;
       }
-      if (rpmNeedleRef.current) {
-        gsap.set(rpmNeedleRef.current, {
-          rotation: 0,
-          transformOrigin: "50% 100%",
+
+      // Clear any existing styles/animations first
+      gsap.killTweensOf([
+        progressBarRef.current,
+        rpmNeedleRef.current,
+        speedNeedleRef.current,
+        textRef.current,
+        telemetryRef.current,
+        percentageRef.current,
+      ]);
+
+      // Hide text elements initially - force them to be hidden immediately before animation starts
+      if (textRef.current) {
+        textRef.current.style.opacity = "0";
+        textRef.current.style.visibility = "hidden";
+        gsap.set(textRef.current, {
+          opacity: 0,
+          visibility: "hidden",
         });
       }
-      if (speedNeedleRef.current) {
-        gsap.set(speedNeedleRef.current, {
-          rotation: 0,
-          transformOrigin: "50% 100%",
+      if (telemetryRef.current) {
+        telemetryRef.current.style.opacity = "0";
+        telemetryRef.current.style.visibility = "hidden";
+        gsap.set(telemetryRef.current, {
+          opacity: 0,
+          visibility: "hidden",
         });
       }
+      if (percentageRef.current) {
+        percentageRef.current.style.opacity = "0";
+        percentageRef.current.style.visibility = "hidden";
+        gsap.set(percentageRef.current, {
+          opacity: 0,
+          visibility: "hidden",
+        });
+      }
+
+      // Initialize progress bar
+      gsap.set(progressBarRef.current, {
+        width: "0%",
+        clearProps: "transform,opacity",
+      });
+
+      // Initialize RPM needle
+      gsap.set(rpmNeedleRef.current, {
+        rotation: 0,
+        transformOrigin: "50% 100%",
+        clearProps: "transform",
+      });
+
+      // Initialize speed needle
+      gsap.set(speedNeedleRef.current, {
+        rotation: 0,
+        transformOrigin: "50% 100%",
+        clearProps: "transform",
+      });
 
       timelineInstance = gsap.timeline();
 
-      // Enhanced progress animation with F1 timing
+      // Enhanced progress animation with F1 timing - ensure full 0-100% progression
+      const totalAnimationDuration = 5; // Total duration for full animation sequence
+
+      // Create progress steps that sequentially build up to 100%
       loadingSteps.forEach((step, index) => {
+        const prevProgress = index === 0 ? 0 : loadingSteps[index - 1].progress;
+        const progressDelta = step.progress - prevProgress;
+        // Each step takes time proportional to its progress delta
+        const stepDuration = (totalAnimationDuration * progressDelta) / 100;
+
         timelineInstance.to(
           {},
           {
-            duration: index === 0 ? 0.5 : gsap.utils.random(0.3, 0.6),
-            onUpdate: function () {
-              const prevProgress =
-                index === 0 ? 0 : loadingSteps[index - 1].progress;
-              const currentProgress = gsap.utils.interpolate(
-                prevProgress,
-                step.progress,
-                this.progress()
-              );
-              setLoadingProgress(Math.round(currentProgress));
+            duration: stepDuration,
+            onStart: function () {
+              // Update text when step starts
               setLoadingText(step.text);
+            },
+            onUpdate: function () {
+              // Smoothly interpolate progress within this step
+              const currentProgress =
+                prevProgress + progressDelta * this.progress();
+              setLoadingProgress(Math.round(currentProgress));
 
-              // Update telemetry to match loading step
+              // Update telemetry smoothly to match loading step targets
+              const prevStep =
+                index === 0
+                  ? { rpm: 0, speed: 0, temp: 20 }
+                  : loadingSteps[index - 1];
               setTelemetryData((prev) => ({
-                ...prev,
-                rpm: gsap.utils.interpolate(
-                  prev.rpm,
-                  step.rpm,
-                  this.progress()
-                ),
-                speed: gsap.utils.interpolate(
-                  prev.speed,
-                  step.speed,
-                  this.progress()
-                ),
-                temp: gsap.utils.interpolate(
-                  prev.temp,
-                  step.temp,
-                  this.progress()
-                ),
+                rpm: prevStep.rpm + (step.rpm - prevStep.rpm) * this.progress(),
+                speed:
+                  prevStep.speed +
+                  (step.speed - prevStep.speed) * this.progress(),
+                temp:
+                  prevStep.temp + (step.temp - prevStep.temp) * this.progress(),
+                gear: prev.gear,
+                fuel: prev.fuel,
               }));
             },
           }
         );
       });
 
-      // Enhanced progress bar with F1 styling
+      // Enhanced progress bar with F1 styling - matches total animation duration
       if (progressBarRef.current) {
         timelineInstance.to(
           progressBarRef.current,
           {
             width: "100%",
-            duration: 3,
+            duration: totalAnimationDuration,
             ease: "power2.inOut",
           },
           0
         );
       }
 
-      // F1 Start lights sequence (5 red lights)
+      // F1 Start lights sequence (5 red lights) - synchronized with progress
       lightsRef.current.forEach((light, index) => {
         if (light) {
           timelineInstance.to(
@@ -255,12 +333,12 @@ export default function AdvancedLoadingSystem({
               duration: 0.2,
               ease: "power2.inOut",
             },
-            0.8 + index * 0.4
+            1.0 + index * 0.5
           );
         }
       });
 
-      // All lights off (race start!)
+      // All lights off (race start!) - happens near the end
       timelineInstance.to(
         lightsRef.current.filter(Boolean),
         {
@@ -270,20 +348,60 @@ export default function AdvancedLoadingSystem({
           duration: 0.1,
           ease: "power2.inOut",
         },
-        3.2
+        totalAnimationDuration - 0.8
       );
 
-      // RPM and Speed needle animations
+      // Show all text elements at the very start of the animation (synchronized with animation start)
+      if (textRef.current) {
+        timelineInstance.to(
+          textRef.current,
+          {
+            opacity: 1,
+            visibility: "visible",
+            duration: 0.6,
+            ease: "power2.out",
+          },
+          0
+        );
+      }
+      if (telemetryRef.current) {
+        timelineInstance.to(
+          telemetryRef.current,
+          {
+            opacity: 1,
+            visibility: "visible",
+            duration: 0.6,
+            ease: "power2.out",
+          },
+          0.2
+        );
+      }
+      if (percentageRef.current) {
+        timelineInstance.to(
+          percentageRef.current,
+          {
+            opacity: 1,
+            visibility: "visible",
+            duration: 0.6,
+            ease: "power2.out",
+          },
+          0
+        );
+      }
+
+      // RPM and Speed needle animations - span the full duration
+      // Re-check refs are still valid before animating
       if (rpmNeedleRef.current) {
         timelineInstance.to(
           rpmNeedleRef.current,
           {
             rotation: 270,
-            duration: 2.5,
+            duration: totalAnimationDuration * 0.8,
             ease: "power2.inOut",
             transformOrigin: "50% 100%",
+            immediateRender: false,
           },
-          0.5
+          0.3
         );
       }
 
@@ -292,16 +410,17 @@ export default function AdvancedLoadingSystem({
           speedNeedleRef.current,
           {
             rotation: 180,
-            duration: 2.8,
+            duration: totalAnimationDuration * 0.85,
             ease: "power2.inOut",
             transformOrigin: "50% 100%",
+            immediateRender: false,
           },
-          0.8
+          0.5
         );
       }
 
-      // Calculate when all main animations complete
-      // Speed needle finishes latest at 0.8 + 2.8 = 3.6s, so exit starts after that
+      // Exit animation starts after main animation completes (totalAnimationDuration + small gap)
+      const exitStartTime = totalAnimationDuration + 0.3;
       timelineInstance.to(
         containerRef.current,
         {
@@ -325,18 +444,20 @@ export default function AdvancedLoadingSystem({
             }
           },
         },
-        "+=0.4" // Start 0.4s after the last animation (speed needle at 3.6s)
+        exitStartTime
       );
 
-      // Create a promise that resolves when timeline completes
+      // Ensure the animation runs to completion by waiting for timeline
+      // The timeline's onComplete fires when the exit animation finishes
       const timelinePromise = new Promise<void>((resolve) => {
         timelineInstance.eventCallback("onComplete", () => {
           resolve();
         });
       });
 
-      // Wait for both animation and preloading
-      await Promise.all([timelinePromise, preloadPromise]);
+      // Wait for timeline to fully complete (but don't wait for preload to block animation)
+      // This ensures the full 0-100% animation plays regardless of resource loading speed
+      await timelinePromise;
     };
 
     initializeLoadingSystem();
@@ -371,7 +492,11 @@ export default function AdvancedLoadingSystem({
 
       <div className="flex flex-col items-center justify-center space-y-8 relative z-10">
         {/* Enhanced F1 branding */}
-        <div ref={textRef} className="text-center">
+        <div
+          ref={textRef}
+          className="text-center"
+          style={{ opacity: 0, visibility: "hidden" }}
+        >
           <div className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3 relative">
             F1/DEV PORTFOLIO
             <div className="absolute -inset-4 bg-[#00D2BE]/10 blur-2xl rounded-full animate-pulse" />
@@ -483,7 +608,11 @@ export default function AdvancedLoadingSystem({
           </div>
           <div className="flex justify-between mt-3 text-sm text-neutral-500 font-f1">
             <span>0%</span>
-            <span ref={percentageRef} className="text-[#00D2BE] font-f1-bold">
+            <span
+              ref={percentageRef}
+              className="text-[#00D2BE] font-f1-bold"
+              style={{ opacity: 0, visibility: "hidden" }}
+            >
               {loadingProgress}%
             </span>
             <span>100%</span>

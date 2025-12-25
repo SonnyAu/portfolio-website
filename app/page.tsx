@@ -118,6 +118,11 @@ export default function EnhancedF1Portfolio() {
       // Mark body as preloader complete to remove CSS hiding
       document.body.classList.add("preloader-complete")
       
+      // Remove the hidden class that was added by the inline script
+      if (mainContentRef.current) {
+        mainContentRef.current.classList.remove("main-content-hidden")
+      }
+      
       // Clear any existing animations
       gsap.killTweensOf(mainContentRef.current)
 
@@ -241,7 +246,7 @@ export default function EnhancedF1Portfolio() {
       <div
         ref={mainContentRef}
         data-main-content
-        className="bg-[#0a0a0a] text-neutral-200 font-f1 overflow-x-hidden relative"
+        className="bg-[#0a0a0a] text-neutral-200 font-f1 overflow-x-hidden relative main-content-hidden"
         style={{
           backgroundImage: `
             radial-gradient(circle at 20% 20%, rgba(0, 210, 190, var(--scroll-intensity, 0.1)) 0%, transparent 50%),

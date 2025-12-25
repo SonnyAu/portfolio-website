@@ -339,30 +339,7 @@ export default function RootLayout({
         {/* <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" /> */}
       </head>
       <body className={`${inter.variable} antialiased`}>
-        {/* Inline script to prevent flash of unstyled content - runs before React hydrates */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Hide main content until preloader completes - prevents flash
-              (function() {
-                function hideMainContent() {
-                  const mainContent = document.querySelector('[data-main-content]');
-                  if (mainContent) {
-                    mainContent.style.opacity = '0';
-                    mainContent.style.visibility = 'hidden';
-                    mainContent.style.overflow = 'hidden';
-                  }
-                }
-                // Run immediately if DOM is ready, otherwise wait
-                if (document.readyState === 'loading') {
-                  document.addEventListener('DOMContentLoaded', hideMainContent);
-                } else {
-                  hideMainContent();
-                }
-              })();
-            `,
-          }}
-        />
+        {/* Class is already added in JSX to prevent hydration mismatch */}
         {children}
 
         {/* Performance monitoring script */}
