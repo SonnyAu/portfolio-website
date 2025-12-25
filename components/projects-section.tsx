@@ -5,6 +5,7 @@ import { gsap } from "gsap"
 import Image from "next/image"
 import { ArrowUpRight, Github, ExternalLink, Zap } from "lucide-react"
 import HRDashboardDemo from "./hr-dashboard-demo"
+import PalateTagsDemo from "./palate-tags-demo"
 
 interface Project {
   title: string
@@ -22,16 +23,19 @@ const projects: Project[] = [
     title: "HR/INTERN INTERNAL DASHBOARD",
     description:
       "Built an internal HR and intern dashboard that centralizes intern task tracking and supports automated, data-driven email personalization for onboarding, offboarding, and internal HR communications.",
-    tags: ["Next.js", "SendGrid", "Tailwind CSS", "GraphQL", "PostgreSQL", "Node.js"],
+    tags: ["Next.js", "Tailwind CSS", "GraphQL", "PostgreSQL", "SendGrid"],
     impact: "SkyIT Internal",
     techHighlight: "SendGrid Integration",
     interactiveDemo: <HRDashboardDemo />,
   },
   {
-    title: "PROJECT TWO",
-    description: "Coming soon...",
-    tags: [],
-    impact: "Coming Soon",
+    title: "PALATE TAGS EDITOR",
+    description:
+      "A restaurant management tool that enables restaurants to edit and customize tags for their dishes. Features an intuitive table interface for efficient tag management across multiple dishes.",
+    tags: ["Next.js", "TypeScript", "Tailwind CSS", "Node.js", "PostgreSQL"],
+    impact: "Restaurant Platform",
+    techHighlight: "Tag Management",
+    interactiveDemo: <PalateTagsDemo />,
   },
 ]
 
