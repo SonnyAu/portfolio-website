@@ -326,12 +326,21 @@ export default function AdvancedLoadingSystem({
       }
 
       // Create timeline - this must always happen for animation to run
+      // Timeline plays automatically when created
+      let timelineResolve: (() => void) | null = null;
+      const timelineCompletePromise = new Promise<void>((resolve) => {
+        timelineResolve = resolve;
+      });
+
       timelineInstance = gsap.timeline({
         onStart: () => {
           console.log("F1 Loading animation started");
         },
         onComplete: () => {
           console.log("F1 Loading animation completed");
+          if (timelineResolve) {
+            timelineResolve();
+          }
         },
       });
 
@@ -490,11 +499,74 @@ export default function AdvancedLoadingSystem({
         );
       }
 
-      // Exit animation starts after main animation completes (totalAnimationDuration + small gap)
-      const exitStartTime = totalAnimationDuration + 0.3;
-      timelineInstance.to(
-        containerRef.current,
-        {
+      // Wait for main content to be ready before starting exit animation
+      // This ensures smooth transition without blank screen
+      const waitForMainContent = async (): Promise<void> => {
+        return new Promise((resolve) => {
+          let checks = 0;
+          const maxChecks = 100; // Check for up to 10 seconds (100 * 100ms)
+
+          const checkMainContent = () => {
+            checks++;
+
+            // Check if main content exists and has some content loaded
+            const mainContent = document.querySelector("[data-main-content]");
+            const hasContent = mainContent && mainContent.children.length > 0;
+
+            // Also check if React has hydrated by looking for interactive elements
+            // These elements exist even if hidden by CSS
+            const hasHydrated =
+              document.querySelector("header, #hero, main, section") !== null;
+
+            // If we have content structure, we're ready (but wait a bit for smooth transition)
+            if ((hasContent || hasHydrated) && checks > 5) {
+              // Content is ready, wait a bit more for smooth transition
+              setTimeout(resolve, 300);
+              return;
+            }
+
+            if (checks >= maxChecks) {
+              // Timeout - proceed anyway to avoid infinite wait
+              resolve();
+              return;
+            }
+
+            // Check again after a short delay
+            setTimeout(checkMainContent, 100);
+          };
+
+          // Start checking after animation has played for most of its duration
+          // This allows the animation to play while we check for content readiness
+          setTimeout(checkMainContent, totalAnimationDuration * 1000 - 1000);
+        });
+      };
+
+      // timelineCompletePromise is already created above when timeline is initialized
+      // It will resolve when the timeline's onComplete fires
+      // Add a fallback timeout in case the timeline doesn't complete
+      const timelineCompleteWithFallback = Promise.race([
+        timelineCompletePromise,
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn("Timeline completion timeout - proceeding anyway");
+            resolve();
+          }, (totalAnimationDuration + 1) * 1000);
+        }),
+      ]);
+
+      // Wait for main content to be ready (runs in parallel)
+      const contentReadyPromise = waitForMainContent();
+
+      // Wait for both animation to complete AND content to be ready
+      // This ensures the animation plays fully AND content is ready before exit
+      await Promise.all([timelineCompleteWithFallback, contentReadyPromise]);
+
+      // Add a small delay for smooth transition
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Now start the exit animation (content is ready, so no blank screen)
+      if (containerRef.current) {
+        gsap.to(containerRef.current, {
           opacity: 0,
           scale: 1.1,
           filter: "blur(10px)",
@@ -514,21 +586,11 @@ export default function AdvancedLoadingSystem({
               window.dispatchEvent(new CustomEvent("preloaderComplete"));
             }
           },
-        },
-        exitStartTime
-      );
-
-      // Ensure the animation runs to completion by waiting for timeline
-      // The timeline's onComplete fires when the exit animation finishes
-      const timelinePromise = new Promise<void>((resolve) => {
-        timelineInstance.eventCallback("onComplete", () => {
-          resolve();
         });
-      });
+      }
 
-      // Wait for timeline to fully complete (but don't wait for preload to block animation)
-      // This ensures the full 0-100% animation plays regardless of resource loading speed
-      await timelinePromise;
+      // The exit animation is handled separately above, so we don't need to wait for timeline completion
+      // The function will complete after the exit animation finishes (handled in onComplete callback)
     };
 
     initializeLoadingSystem();
