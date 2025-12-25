@@ -78,6 +78,24 @@ export default function AdvancedLoadingSystem({
     let telemetryInterval: NodeJS.Timeout;
 
     const initializeLoadingSystem = async () => {
+      // Ensure we're in browser environment
+      if (typeof window === "undefined" || typeof document === "undefined") {
+        return;
+      }
+
+      // Wait for GSAP to be available (critical for production)
+      let gsapRetries = 0;
+      const maxGsapRetries = 50;
+      while (typeof gsap === "undefined" && gsapRetries < maxGsapRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        gsapRetries++;
+      }
+
+      if (typeof gsap === "undefined") {
+        console.error("GSAP not available after waiting");
+        return;
+      }
+
       // Ensure container is visible immediately (before any delay)
       if (containerRef.current) {
         containerRef.current.style.opacity = "1";
@@ -92,25 +110,43 @@ export default function AdvancedLoadingSystem({
       );
 
       // Wait for all critical refs to be attached to the DOM with retry logic
+      // Increased retries and added small delays for production reliability
       let retries = 0;
-      const maxRetries = 20; // Increased retries for reliability
+      const maxRetries = 50; // Increased significantly for production
       while (
         (!progressBarRef.current ||
           !rpmNeedleRef.current ||
-          !speedNeedleRef.current) &&
+          !speedNeedleRef.current ||
+          !containerRef.current) &&
         retries < maxRetries
       ) {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 10); // Small delay for production
+          });
+        });
         retries++;
       }
 
-      // Final check - if refs still aren't ready, wait one more frame
+      // Final check - if refs still aren't ready, wait a bit more
       if (
         !progressBarRef.current ||
         !rpmNeedleRef.current ||
         !speedNeedleRef.current
       ) {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        // Try one more time with a longer wait
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // If still not ready, log error but try to continue anyway
+        if (
+          !progressBarRef.current ||
+          !rpmNeedleRef.current ||
+          !speedNeedleRef.current
+        ) {
+          console.warn(
+            "Loading system refs not ready after retries, attempting to continue"
+          );
+        }
       }
 
       // F1 Loading sequence with realistic telemetry
@@ -195,26 +231,47 @@ export default function AdvancedLoadingSystem({
       const preloadPromise = preloadCriticalResources();
 
       // Initialize all refs before starting animations - ensure they exist
+      // In production, we'll try to continue even if some refs aren't ready
       if (
         !progressBarRef.current ||
         !rpmNeedleRef.current ||
         !speedNeedleRef.current
       ) {
-        console.warn(
-          "Loading system refs not ready, skipping animation initialization"
-        );
-        return;
+        // Final attempt: wait one more frame and check again
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+
+        if (
+          !progressBarRef.current ||
+          !rpmNeedleRef.current ||
+          !speedNeedleRef.current
+        ) {
+          console.error(
+            "Loading system refs not ready after all retries. Refs:",
+            {
+              progressBar: !!progressBarRef.current,
+              rpmNeedle: !!rpmNeedleRef.current,
+              speedNeedle: !!speedNeedleRef.current,
+              container: !!containerRef.current,
+            }
+          );
+          // Don't return - try to start animation anyway with available refs
+          // This ensures the animation at least attempts to run in production
+        }
       }
 
-      // Clear any existing styles/animations first
-      gsap.killTweensOf([
+      // Clear any existing styles/animations first (only if refs exist)
+      const refsToClear = [
         progressBarRef.current,
         rpmNeedleRef.current,
         speedNeedleRef.current,
         textRef.current,
         telemetryRef.current,
         percentageRef.current,
-      ]);
+      ].filter(Boolean);
+
+      if (refsToClear.length > 0) {
+        gsap.killTweensOf(refsToClear);
+      }
 
       // Hide text elements initially - force them to be hidden immediately before animation starts
       if (textRef.current) {
@@ -242,27 +299,41 @@ export default function AdvancedLoadingSystem({
         });
       }
 
-      // Initialize progress bar
-      gsap.set(progressBarRef.current, {
-        width: "0%",
-        clearProps: "transform,opacity",
-      });
+      // Initialize progress bar (only if ref exists)
+      if (progressBarRef.current) {
+        gsap.set(progressBarRef.current, {
+          width: "0%",
+          clearProps: "transform,opacity",
+        });
+      }
 
-      // Initialize RPM needle
-      gsap.set(rpmNeedleRef.current, {
-        rotation: 0,
-        transformOrigin: "50% 100%",
-        clearProps: "transform",
-      });
+      // Initialize RPM needle (only if ref exists)
+      if (rpmNeedleRef.current) {
+        gsap.set(rpmNeedleRef.current, {
+          rotation: 0,
+          transformOrigin: "50% 100%",
+          clearProps: "transform",
+        });
+      }
 
-      // Initialize speed needle
-      gsap.set(speedNeedleRef.current, {
-        rotation: 0,
-        transformOrigin: "50% 100%",
-        clearProps: "transform",
-      });
+      // Initialize speed needle (only if ref exists)
+      if (speedNeedleRef.current) {
+        gsap.set(speedNeedleRef.current, {
+          rotation: 0,
+          transformOrigin: "50% 100%",
+          clearProps: "transform",
+        });
+      }
 
-      timelineInstance = gsap.timeline();
+      // Create timeline - this must always happen for animation to run
+      timelineInstance = gsap.timeline({
+        onStart: () => {
+          console.log("F1 Loading animation started");
+        },
+        onComplete: () => {
+          console.log("F1 Loading animation completed");
+        },
+      });
 
       // Enhanced progress animation with F1 timing - ensure full 0-100% progression
       const totalAnimationDuration = 5; // Total duration for full animation sequence
