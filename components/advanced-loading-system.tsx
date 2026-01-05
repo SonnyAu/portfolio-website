@@ -83,18 +83,40 @@ export default function AdvancedLoadingSystem({
         return;
       }
 
-      // Wait for GSAP to be available (critical for production)
+      // Wait for GSAP to be available and functional (critical for production)
+      // In production, GSAP might be code-split and loaded asynchronously
       let gsapRetries = 0;
-      const maxGsapRetries = 50;
-      while (typeof gsap === "undefined" && gsapRetries < maxGsapRetries) {
+      const maxGsapRetries = 100; // Increased for production reliability
+      const isGsapReady = () => {
+        try {
+          return (
+            typeof gsap !== "undefined" &&
+            gsap !== null &&
+            typeof gsap.timeline === "function" &&
+            typeof gsap.to === "function" &&
+            typeof gsap.set === "function"
+          );
+        } catch (e) {
+          return false;
+        }
+      };
+
+      while (!isGsapReady() && gsapRetries < maxGsapRetries) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         gsapRetries++;
       }
 
-      if (typeof gsap === "undefined") {
-        console.error("GSAP not available after waiting");
+      if (!isGsapReady()) {
+        console.error("GSAP not available or not functional after waiting", {
+          gsap: typeof gsap,
+          hasTimeline: typeof gsap?.timeline,
+          hasTo: typeof gsap?.to,
+          hasSet: typeof gsap?.set,
+        });
         return;
       }
+
+      console.log("GSAP is ready and functional");
 
       // Ensure container is visible immediately (before any delay)
       if (containerRef.current) {
@@ -333,6 +355,7 @@ export default function AdvancedLoadingSystem({
       });
 
       timelineInstance = gsap.timeline({
+        paused: false, // Explicitly ensure it's not paused
         onStart: () => {
           console.log("F1 Loading animation started");
         },
@@ -342,6 +365,20 @@ export default function AdvancedLoadingSystem({
             timelineResolve();
           }
         },
+      });
+
+      // Explicitly start the timeline (in case it didn't auto-start in production)
+      // This ensures the animation plays even if there are timing issues
+      if (timelineInstance.paused()) {
+        console.log("Timeline was paused, starting it now");
+        timelineInstance.play();
+      }
+
+      // Verify timeline is actually playing
+      console.log("Timeline created", {
+        paused: timelineInstance.paused(),
+        duration: timelineInstance.duration(),
+        progress: timelineInstance.progress(),
       });
 
       // Enhanced progress animation with F1 timing - ensure full 0-100% progression
@@ -497,6 +534,27 @@ export default function AdvancedLoadingSystem({
           },
           0.5
         );
+      }
+
+      // Verify timeline has animations and is ready to play (critical for production)
+      const timelineDuration = timelineInstance.duration();
+      const hasAnimations = timelineDuration > 0;
+
+      console.log("Timeline verification", {
+        duration: timelineDuration,
+        hasAnimations,
+        paused: timelineInstance.paused(),
+        children: timelineInstance.getChildren().length,
+      });
+
+      if (!hasAnimations) {
+        console.error("Timeline has no animations! This should not happen.");
+      }
+
+      // Force timeline to play if it's paused (production safety)
+      if (timelineInstance.paused()) {
+        console.warn("Timeline is paused after setup, forcing play");
+        timelineInstance.play();
       }
 
       // Wait for main content to be ready before starting exit animation
