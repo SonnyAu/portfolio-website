@@ -286,40 +286,14 @@ export default function AdvancedLoadingSystem({
         progressBarRef.current,
         rpmNeedleRef.current,
         speedNeedleRef.current,
-        textRef.current,
-        telemetryRef.current,
-        percentageRef.current,
       ].filter(Boolean);
 
       if (refsToClear.length > 0) {
         gsap.killTweensOf(refsToClear);
       }
 
-      // Hide text elements initially - force them to be hidden immediately before animation starts
-      if (textRef.current) {
-        textRef.current.style.opacity = "0";
-        textRef.current.style.visibility = "hidden";
-        gsap.set(textRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
-      if (telemetryRef.current) {
-        telemetryRef.current.style.opacity = "0";
-        telemetryRef.current.style.visibility = "hidden";
-        gsap.set(telemetryRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
-      if (percentageRef.current) {
-        percentageRef.current.style.opacity = "0";
-        percentageRef.current.style.visibility = "hidden";
-        gsap.set(percentageRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
+      // Text elements are visible by default through CSS - no need to set visibility
+      // This ensures F1 telemetry content shows immediately in production
 
       // Initialize progress bar (only if ref exists)
       if (progressBarRef.current) {
@@ -468,43 +442,8 @@ export default function AdvancedLoadingSystem({
         totalAnimationDuration - 0.8
       );
 
-      // Show all text elements at the very start of the animation (synchronized with animation start)
-      if (textRef.current) {
-        timelineInstance.to(
-          textRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0
-        );
-      }
-      if (telemetryRef.current) {
-        timelineInstance.to(
-          telemetryRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0.2
-        );
-      }
-      if (percentageRef.current) {
-        timelineInstance.to(
-          percentageRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0
-        );
-      }
+      // Elements are visible by default - no need to animate visibility
+      // This ensures F1 telemetry content shows immediately in production
 
       // RPM and Speed needle animations - span the full duration
       // Re-check refs are still valid before animating
@@ -681,12 +620,15 @@ export default function AdvancedLoadingSystem({
         <div className="absolute top-1/3 left-0 w-full h-full bg-gradient-to-r from-transparent via-[#ff0000] to-transparent transform skew-y-12 scale-150 animate-pulse" />
       </div>
 
-      <div className="flex flex-col items-center justify-center space-y-8 relative z-10">
+      <div 
+        className="flex flex-col items-center justify-center space-y-8 relative z-10"
+        style={{ opacity: 1, visibility: 'visible' }}
+      >
         {/* Enhanced F1 branding */}
         <div
           ref={textRef}
           className="text-center"
-          style={{ opacity: 0, visibility: "hidden" }}
+          style={{ fontFamily: '"Formula1", system-ui, -apple-system, sans-serif', opacity: 1, visibility: 'visible' }}
         >
           <div className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3 relative">
             F1/DEV PORTFOLIO
@@ -802,7 +744,6 @@ export default function AdvancedLoadingSystem({
             <span
               ref={percentageRef}
               className="text-[#00D2BE] font-f1-bold"
-              style={{ opacity: 0, visibility: "hidden" }}
             >
               {loadingProgress}%
             </span>

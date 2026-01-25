@@ -16,8 +16,18 @@ const AdvancedLoadingSystem = dynamic(() => import("@/components/advanced-loadin
       style={{ opacity: 1, visibility: "visible", display: "flex" }}
     >
       <div className="text-center">
-        <div className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3">F1/DEV PORTFOLIO</div>
-        <div className="text-sm md:text-lg text-neutral-400 font-f1">SYSTEM INITIALIZATION</div>
+        <div 
+          className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3"
+          style={{ fontFamily: '"Formula1", system-ui, -apple-system, sans-serif' }}
+        >
+          F1/DEV PORTFOLIO
+        </div>
+        <div 
+          className="text-sm md:text-lg text-neutral-400 font-f1"
+          style={{ fontFamily: '"Formula1", system-ui, -apple-system, sans-serif' }}
+        >
+          SYSTEM INITIALIZATION
+        </div>
       </div>
     </div>
   ),
