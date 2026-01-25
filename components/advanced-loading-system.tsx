@@ -295,32 +295,6 @@ export default function AdvancedLoadingSystem({
         gsap.killTweensOf(refsToClear);
       }
 
-      // Hide text elements initially - force them to be hidden immediately before animation starts
-      if (textRef.current) {
-        textRef.current.style.opacity = "0";
-        textRef.current.style.visibility = "hidden";
-        gsap.set(textRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
-      if (telemetryRef.current) {
-        telemetryRef.current.style.opacity = "0";
-        telemetryRef.current.style.visibility = "hidden";
-        gsap.set(telemetryRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
-      if (percentageRef.current) {
-        percentageRef.current.style.opacity = "0";
-        percentageRef.current.style.visibility = "hidden";
-        gsap.set(percentageRef.current, {
-          opacity: 0,
-          visibility: "hidden",
-        });
-      }
-
       // Initialize progress bar (only if ref exists)
       if (progressBarRef.current) {
         gsap.set(progressBarRef.current, {
@@ -467,44 +441,6 @@ export default function AdvancedLoadingSystem({
         },
         totalAnimationDuration - 0.8
       );
-
-      // Show all text elements at the very start of the animation (synchronized with animation start)
-      if (textRef.current) {
-        timelineInstance.to(
-          textRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0
-        );
-      }
-      if (telemetryRef.current) {
-        timelineInstance.to(
-          telemetryRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0.2
-        );
-      }
-      if (percentageRef.current) {
-        timelineInstance.to(
-          percentageRef.current,
-          {
-            opacity: 1,
-            visibility: "visible",
-            duration: 0.6,
-            ease: "power2.out",
-          },
-          0
-        );
-      }
 
       // RPM and Speed needle animations - span the full duration
       // Re-check refs are still valid before animating
@@ -686,7 +622,6 @@ export default function AdvancedLoadingSystem({
         <div
           ref={textRef}
           className="text-center"
-          style={{ opacity: 0, visibility: "hidden" }}
         >
           <div className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3 relative">
             F1/DEV PORTFOLIO
@@ -802,7 +737,6 @@ export default function AdvancedLoadingSystem({
             <span
               ref={percentageRef}
               className="text-[#00D2BE] font-f1-bold"
-              style={{ opacity: 0, visibility: "hidden" }}
             >
               {loadingProgress}%
             </span>
