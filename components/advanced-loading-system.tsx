@@ -282,6 +282,9 @@ export default function AdvancedLoadingSystem({
       }
 
       // Clear any existing styles/animations first (only if refs exist)
+      // Note: textRef, telemetryRef, and percentageRef are intentionally excluded
+      // because they are now visible by default (no hidden styling) and don't need
+      // GSAP manipulation for visibility - this fixes production loading issues
       const refsToClear = [
         progressBarRef.current,
         rpmNeedleRef.current,
@@ -292,8 +295,10 @@ export default function AdvancedLoadingSystem({
         gsap.killTweensOf(refsToClear);
       }
 
-      // Text elements are visible by default through CSS - no need to set visibility
-      // This ensures F1 telemetry content shows immediately in production
+      // Text elements (textRef, telemetryRef, percentageRef) are visible by default
+      // through CSS - no GSAP visibility manipulation needed. This ensures F1 
+      // telemetry content shows immediately in production without relying on 
+      // timeline animations which could fail or be delayed.
 
       // Initialize progress bar (only if ref exists)
       if (progressBarRef.current) {

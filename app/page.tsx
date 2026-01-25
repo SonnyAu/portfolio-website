@@ -6,6 +6,9 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { TextPlugin } from "gsap/TextPlugin"
 import dynamic from "next/dynamic"
 
+// Font family with system fallbacks for reliable rendering
+const F1_FONT_FAMILY = '"Formula1", system-ui, -apple-system, sans-serif'
+
 // Loading system must be client-only to avoid SSR hydration issues
 const AdvancedLoadingSystem = dynamic(() => import("@/components/advanced-loading-system"), {
   ssr: false,
@@ -18,13 +21,13 @@ const AdvancedLoadingSystem = dynamic(() => import("@/components/advanced-loadin
       <div className="text-center">
         <div 
           className="text-3xl md:text-5xl font-f1-bold text-[#00D2BE] mb-3"
-          style={{ fontFamily: '"Formula1", system-ui, -apple-system, sans-serif' }}
+          style={{ fontFamily: F1_FONT_FAMILY }}
         >
           F1/DEV PORTFOLIO
         </div>
         <div 
           className="text-sm md:text-lg text-neutral-400 font-f1"
-          style={{ fontFamily: '"Formula1", system-ui, -apple-system, sans-serif' }}
+          style={{ fontFamily: F1_FONT_FAMILY }}
         >
           SYSTEM INITIALIZATION
         </div>
