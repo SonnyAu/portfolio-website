@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -11,8 +11,30 @@ export default function F1TelemetryBackground() {
   const telemetryRef = useRef<SVGSVGElement>(null)
   const brakeDiscsRef = useRef<HTMLDivElement>(null)
   const dataStreamRef = useRef<HTMLDivElement>(null)
+  const [isPreloaderComplete, setIsPreloaderComplete] = useState(false)
+
+  // Listen for preloader completion before starting animations
+  useEffect(() => {
+    // Check if preloader already completed (e.g., on navigation back)
+    if (document.body.classList.contains("preloader-complete")) {
+      setIsPreloaderComplete(true)
+      return
+    }
+
+    const handlePreloaderComplete = () => {
+      setIsPreloaderComplete(true)
+    }
+
+    window.addEventListener("preloaderComplete", handlePreloaderComplete)
+    return () => {
+      window.removeEventListener("preloaderComplete", handlePreloaderComplete)
+    }
+  }, [])
 
   useEffect(() => {
+    // Wait for preloader to complete before starting animations
+    if (!isPreloaderComplete) return
+
     // Animate telemetry data streams (reduce on low-end devices)
     if (telemetryRef.current) {
       const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -157,7 +179,7 @@ export default function F1TelemetryBackground() {
         dataStreamRef.current.innerHTML = ""
       }
     }
-  }, [])
+  }, [isPreloaderComplete])
 
   return (
     <div ref={containerRef} className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
