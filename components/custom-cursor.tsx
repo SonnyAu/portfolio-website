@@ -1,194 +1,124 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, memo } from "react"
 import { gsap } from "gsap"
 
-export default function CustomCursor() {
+const CustomCursor = memo(function CustomCursor() {
   const cursorRef = useRef<HTMLDivElement>(null)
   const followerRef = useRef<HTMLDivElement>(null)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(true) // Default to mobile to avoid flash
 
   useEffect(() => {
-    // Check if device is mobile
+    // Check if device is mobile or prefers reduced motion
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || "ontouchstart" in window)
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0
+      const isSmallScreen = window.innerWidth < 768
+      setIsMobile(isSmallScreen || isTouch || prefersReducedMotion)
     }
 
     checkMobile()
-    window.addEventListener("resize", checkMobile)
 
-    return () => window.removeEventListener("resize", checkMobile)
+    // Throttled resize handler
+    let resizeTimer: ReturnType<typeof setTimeout>
+    const handleResize = () => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(checkMobile, 150)
+    }
+
+    window.addEventListener("resize", handleResize, { passive: true })
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      clearTimeout(resizeTimer)
+    }
   }, [])
 
   useEffect(() => {
-    if (isMobile) {
-      // Add haptic feedback for mobile devices
-      const addHapticFeedback = () => {
-        const interactiveElements = document.querySelectorAll("button, a, input, [role='button'], .project-card")
+    if (isMobile) return
 
-        interactiveElements.forEach((el) => {
-          const handleTouchStart = () => {
-            // Light haptic feedback
-            if (navigator.vibrate) {
-              navigator.vibrate(10) // Very short vibration (10ms)
-            }
-          }
+    const cursor = cursorRef.current
+    const follower = followerRef.current
+    if (!cursor || !follower) return
 
-          const handleClick = () => {
-            // Slightly stronger haptic feedback on click
-            if (navigator.vibrate) {
-              navigator.vibrate([15, 10, 15]) // Pattern: vibrate 15ms, pause 10ms, vibrate 15ms
-            }
-          }
+    // Set initial position
+    gsap.set([cursor, follower], {
+      xPercent: -50,
+      yPercent: -50,
+      x: 0,
+      y: 0,
+    })
 
-          el.addEventListener("touchstart", handleTouchStart, { passive: true })
-          el.addEventListener("click", handleClick)
-        })
+    let mouseX = 0
+    let mouseY = 0
+    let rafId: number | null = null
+    let isHoveringInteractive = false
+
+    const updateCursor = () => {
+      if (cursor && follower) {
+        gsap.to(cursor, { x: mouseX, y: mouseY, duration: 0.05, ease: "none" })
+        gsap.to(follower, { x: mouseX, y: mouseY, duration: 0.25, ease: "power2.out" })
+      }
+      rafId = null
+    }
+
+    const onMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX
+      mouseY = e.clientY
+
+      // Throttle with RAF
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateCursor)
       }
 
-      // Add haptic feedback after a short delay to ensure DOM is ready
-      const timer = setTimeout(addHapticFeedback, 100)
-
-      // Re-add haptic feedback when new elements are added (e.g., after animations)
-      const observer = new MutationObserver(addHapticFeedback)
-      observer.observe(document.body, { childList: true, subtree: true })
-
-      return () => {
-        clearTimeout(timer)
-        observer.disconnect()
+      // Check if hovering over interactive element
+      const target = e.target as HTMLElement
+      const isInteractive = target?.closest("button, a, input, [role='button'], .project-card") !== null
+      
+      if (isInteractive !== isHoveringInteractive) {
+        isHoveringInteractive = isInteractive
+        const scale = isInteractive ? 1.4 : 1
+        gsap.to([cursor, follower], { scale, duration: 0.2, ease: "power2.out" })
       }
-    } else {
-      // Desktop cursor logic
-      const cursor = cursorRef.current
-      const follower = followerRef.current
-      if (!cursor || !follower) return
+    }
 
-      // Set initial position to center the cursor properly
-      gsap.set(cursor, {
-        xPercent: -50,
-        yPercent: -50,
-        x: 0,
-        y: 0,
-      })
-      gsap.set(follower, {
-        xPercent: -50,
-        yPercent: -50,
-        x: 0,
-        y: 0,
-      })
+    const onMouseLeave = () => {
+      gsap.to([cursor, follower], { opacity: 0, duration: 0.15 })
+    }
 
-      let mouseX = 0
-      let mouseY = 0
-      let rafId: number | null = null
-      let needsUpdate = false
+    const onMouseEnter = () => {
+      gsap.to([cursor, follower], { opacity: 1, duration: 0.15 })
+    }
 
-      let isHoveringInteractive = false
+    window.addEventListener("mousemove", onMouseMove, { passive: true })
+    document.addEventListener("mouseleave", onMouseLeave)
+    document.addEventListener("mouseenter", onMouseEnter)
 
-      const onMouseMove = (e: MouseEvent) => {
-        mouseX = e.clientX
-        mouseY = e.clientY
-        needsUpdate = true
-
-        // Check if hovering over interactive element
-        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
-        if (elementAtPoint) {
-          const isInteractive = elementAtPoint.closest("button, a, input, [role='button'], .project-card") !== null
-          if (isInteractive && !isHoveringInteractive) {
-            isHoveringInteractive = true
-            gsap.to(follower, { scale: 1.5, duration: 0.3, ease: "power2.out" })
-            gsap.to(cursor, { scale: 1.5, duration: 0.3, ease: "power2.out" })
-          } else if (!isInteractive && isHoveringInteractive) {
-            isHoveringInteractive = false
-            gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
-            gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
-          }
-        }
-
-        // Use requestAnimationFrame for better performance
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            if (needsUpdate && cursor && follower) {
-              // Update cursor position immediately for precise tracking
-              gsap.to(cursor, {
-                duration: 0.05,
-                x: mouseX,
-                y: mouseY,
-                ease: "none",
-              })
-
-              // Follower with slight delay for smooth trailing effect
-              gsap.to(follower, {
-                duration: 0.3,
-                x: mouseX,
-                y: mouseY,
-                ease: "power2.out",
-              })
-              needsUpdate = false
-              rafId = null
-            }
-          })
-        }
-      }
-
-      // Hide cursor when mouse leaves window
-      const onMouseEnterWindow = () => {
-        gsap.to([cursor, follower], { opacity: 1, duration: 0.2 })
-      }
-
-      const onMouseLeaveWindow = () => {
-        gsap.to([cursor, follower], { opacity: 0, duration: 0.2 })
-        isHoveringInteractive = false
-        gsap.to(follower, { scale: 1, duration: 0.3, ease: "power2.out" })
-        gsap.to(cursor, { scale: 1, duration: 0.3, ease: "power2.out" })
-      }
-
-      // Event listeners (passive for better performance)
-      window.addEventListener("mousemove", onMouseMove, { passive: true })
-      document.addEventListener("mouseenter", onMouseEnterWindow)
-      document.addEventListener("mouseleave", onMouseLeaveWindow)
-
-      // Set initial mouse position
-      const setInitialPosition = () => {
-        gsap.set([cursor, follower], { x: mouseX, y: mouseY })
-      }
-
-      // Small delay to ensure proper initialization
-      setTimeout(setInitialPosition, 50)
-
-      return () => {
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId)
-        }
-        window.removeEventListener("mousemove", onMouseMove)
-        document.removeEventListener("mouseenter", onMouseEnterWindow)
-        document.removeEventListener("mouseleave", onMouseLeaveWindow)
-      }
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      window.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("mouseleave", onMouseLeave)
+      document.removeEventListener("mouseenter", onMouseEnter)
     }
   }, [isMobile])
 
-  // Only render cursor elements on desktop
-  if (isMobile) {
-    return null
-  }
+  if (isMobile) return null
 
   return (
     <>
       <div
         ref={cursorRef}
         className="fixed top-0 left-0 w-2 h-2 bg-[#00D2BE] rounded-full pointer-events-none z-50"
-        style={{
-          mixBlendMode: "difference",
-          willChange: "transform",
-        }}
+        style={{ mixBlendMode: "difference", willChange: "transform", contain: "layout style paint" }}
+        aria-hidden="true"
       />
       <div
         ref={followerRef}
-        className="fixed top-0 left-0 w-8 h-8 border-2 border-[#00D2BE] rounded-full pointer-events-none z-50"
-        style={{
-          mixBlendMode: "difference",
-          willChange: "transform",
-        }}
+        className="fixed top-0 left-0 w-7 h-7 border border-[#00D2BE] rounded-full pointer-events-none z-50"
+        style={{ mixBlendMode: "difference", willChange: "transform", contain: "layout style paint" }}
+        aria-hidden="true"
       />
     </>
   )
-}
+})
+
+export default CustomCursor

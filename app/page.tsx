@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, Suspense, lazy, useMemo } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import { TextPlugin } from "gsap/TextPlugin"
 import dynamic from "next/dynamic"
 
 // Loading system must be client-only to avoid SSR hydration issues
@@ -49,7 +48,7 @@ const F1TelemetryBackground = dynamic(() => import("@/components/f1-telemetry-ba
   loading: () => null,
 })
 
-gsap.registerPlugin(ScrollTrigger, TextPlugin)
+gsap.registerPlugin(ScrollTrigger)
 
 // Enhanced loading fallback with F1 styling
 const LoadingFallback = () => (
@@ -140,87 +139,36 @@ export default function EnhancedF1Portfolio() {
           window.scrollTo(0, 0)
 
           if (!prefersReducedMotion && !isLowEndDevice && isMounted) {
-            // Enhanced section animations with F1 timing
-            // Small delay to ensure DOM is ready after hydration
+            // Simplified section animations for better performance
             setTimeout(() => {
               gsap.utils.toArray<HTMLElement>(".section").forEach((section, index) => {
                 const elements = Array.from(section.children)
 
-                // Clear any existing GSAP styles first
                 gsap.killTweensOf(elements)
-                gsap.set(elements, { clearProps: "transform,opacity,scale,translate,rotate" })
+                gsap.set(elements, { clearProps: "transform,opacity" })
 
                 gsap.fromTo(
                   elements,
-                  {
-                    y: 80,
-                    opacity: 0,
-                    scale: 0.95,
-                    rotationX: 10,
-                  },
+                  { y: 40, opacity: 0 },
                   {
                     y: 0,
                     opacity: 1,
-                    scale: 1,
-                    rotationX: 0,
-                    stagger: 0.15,
-                    duration: 1.2,
-                    ease: "back.out(1.4)",
+                    stagger: 0.1,
+                    duration: 0.8,
+                    ease: "power2.out",
                     scrollTrigger: {
                       trigger: section,
                       start: "top 85%",
-                      end: "top 15%",
                       toggleActions: "play none none none",
                       id: `section-${index}`,
-                      onComplete: () => {
-                        ScrollTrigger.getById(`section-${index}`)?.kill()
-                      },
                     },
                   },
                 )
               })
-            }, 100)
+            }, 50)
 
-            // Enhanced parallax effects with F1 telemetry feel
-            gsap.utils.toArray<HTMLElement>(".parallax-slow").forEach((element, index) => {
-              gsap.killTweensOf(element)
-
-              gsap.to(element, {
-                yPercent: -50,
-                ease: "none",
-                scrollTrigger: {
-                  trigger: element,
-                  start: "top bottom",
-                  end: "bottom top",
-                  scrub: 2,
-                  id: `parallax-${index}`,
-                },
-              })
-            })
-
-            // Standard scroll behavior
             ScrollTrigger.config({
               autoRefreshEvents: "visibilitychange,DOMContentLoaded,load",
-            })
-
-            // Enhanced scroll-based animations (throttled for performance)
-            let scrollUpdateRaf: number | null = null
-            ScrollTrigger.create({
-              trigger: "body",
-              start: "top top",
-              end: "bottom bottom",
-              scrub: 1,
-              onUpdate: (self) => {
-                // Throttle updates using requestAnimationFrame
-                if (scrollUpdateRaf === null) {
-                  scrollUpdateRaf = requestAnimationFrame(() => {
-                    const progress = self.progress
-                    // Dynamic background intensity based on scroll
-                    document.documentElement.style.setProperty("--scroll-intensity", `${0.1 + progress * 0.3}`)
-                    scrollUpdateRaf = null
-                  })
-                }
-              },
             })
           }
         },
@@ -234,9 +182,6 @@ export default function EnhancedF1Portfolio() {
       window.removeEventListener("preloaderComplete", handlePreloaderComplete)
       ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
       gsap.globalTimeline.clear()
-
-      // Reset CSS custom properties
-      document.documentElement.style.removeProperty("--scroll-intensity")
     }
   }, [isMounted, performanceSettings])
 
