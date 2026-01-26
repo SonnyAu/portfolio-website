@@ -115,8 +115,9 @@ export default function EnhancedF1Portfolio() {
 
     // Enhanced preloader completion handler
     const handlePreloaderComplete = () => {
-      // Mark body as preloader complete to remove CSS hiding
+      // Mark body and html as preloader complete to remove CSS hiding
       document.body.classList.add("preloader-complete")
+      document.documentElement.classList.add("preloader-complete")
       
       // Remove the hidden class that was added by the inline script
       if (mainContentRef.current) {
