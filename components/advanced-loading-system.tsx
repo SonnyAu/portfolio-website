@@ -83,6 +83,13 @@ export default function AdvancedLoadingSystem({
         return;
       }
 
+      // Immediately scroll to top to ensure page starts at top position
+      // This prevents the issue where browser scroll restoration places the page in the middle
+      if ("scrollRestoration" in history) {
+        history.scrollRestoration = "manual";
+      }
+      window.scrollTo(0, 0);
+
       // Wait for GSAP to be available and functional (critical for production)
       // In production, GSAP might be code-split and loaded asynchronously
       let gsapRetries = 0;
@@ -557,6 +564,9 @@ export default function AdvancedLoadingSystem({
 
       // Add a small delay for smooth transition
       await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Scroll to top right before revealing content to ensure animation appears at top
+      window.scrollTo(0, 0);
 
       // Now start the exit animation (content is ready, so no blank screen)
       if (containerRef.current) {
