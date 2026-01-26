@@ -282,6 +282,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
+        {/* Scroll restoration fix - must run as early as possible */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Disable browser scroll restoration and scroll to top immediately
+              // This prevents the page from appearing scrolled to the middle when the preloader finishes
+              if ('scrollRestoration' in history) {
+                history.scrollRestoration = 'manual';
+              }
+              window.scrollTo(0, 0);
+            `,
+          }}
+        />
+
         {/* Enhanced DNS prefetch and preconnect for performance */}
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
         <link rel="dns-prefetch" href="//fonts.gstatic.com" />
