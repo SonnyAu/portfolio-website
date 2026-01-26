@@ -582,9 +582,10 @@ export default function AdvancedLoadingSystem({
               timelineInstance.kill();
               if (animationId) cancelAnimationFrame(animationId);
               clearInterval(telemetryInterval);
-              // Mark body as preloader complete to allow main content to show
+              // Mark body and html as preloader complete to allow main content to show
               if (typeof document !== "undefined") {
                 document.body.classList.add("preloader-complete");
+                document.documentElement.classList.add("preloader-complete");
               }
               onComplete?.();
               window.dispatchEvent(new CustomEvent("preloaderComplete"));

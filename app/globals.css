@@ -853,6 +853,14 @@ body {
   backface-visibility: hidden;
 }
 
+/* Constrain html and body during loading to prevent page from exceeding viewport height */
+html:not(.preloader-complete),
+body:not(.preloader-complete) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 /* Hide main content until loading completes - prevents flash of content */
 /* Only applies before preloader completes, then GSAP takes over */
 body:not(.preloader-complete) [data-main-content],
@@ -861,6 +869,7 @@ body:not(.preloader-complete) [data-main-content],
   visibility: hidden;
   overflow: hidden;
   pointer-events: none;
+  height: 0;
 }
 
 /* Show content after preloader completes */
@@ -869,6 +878,7 @@ body.preloader-complete [data-main-content].main-content-hidden {
   visibility: visible;
   overflow: visible;
   pointer-events: auto;
+  height: auto;
 }
 
 /* Ensure loading system is always visible initially */
