@@ -1,14 +1,7 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  preload: true,
-  variable: "--font-inter",
-})
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -352,7 +345,7 @@ export default function RootLayout({
         {/* Note: og-image.jpg should be created in public/ folder */}
         {/* <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" /> */}
       </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className="antialiased">
         {/* Class is already added in JSX to prevent hydration mismatch */}
         {children}
 

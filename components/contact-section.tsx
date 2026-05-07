@@ -39,7 +39,7 @@ export default function ContactSection() {
     // Animate form elements on scroll
     const ctx = gsap.context(() => {
       gsap.fromTo(
-        formRef.current?.children,
+        Array.from(formRef.current?.children ?? []),
         { y: 50, opacity: 0 },
         {
           y: 0,

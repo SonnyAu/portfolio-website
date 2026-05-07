@@ -194,7 +194,7 @@ export default function OptimizedPreloader() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                ref={(el) => (lightsRef.current[i] = el)}
+                ref={(el) => { lightsRef.current[i] = el }}
                 className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-[#2a2a2a] border border-neutral-700"
               />
             ))}
