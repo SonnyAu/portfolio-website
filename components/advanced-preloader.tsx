@@ -154,7 +154,7 @@ export default function AdvancedPreloader() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="relative">
                 <div
-                  ref={(el) => (lightsRef.current[i] = el)}
+                  ref={(el) => { lightsRef.current[i] = el }}
                   className="w-4 h-4 md:w-6 md:h-6 rounded-full bg-[#2a2a2a] transition-all duration-200 border-2 border-neutral-700"
                 />
                 <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent to-white/20" />

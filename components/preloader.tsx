@@ -74,7 +74,7 @@ export default function Preloader() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                ref={(el) => (lightsRef.current[i] = el)}
+                ref={(el) => { lightsRef.current[i] = el }}
                 className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#2a2a2a] transition-all duration-200"
               />
             ))}
