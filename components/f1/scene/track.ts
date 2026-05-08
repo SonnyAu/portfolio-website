@@ -10,11 +10,57 @@ export type TrackSystem = {
 }
 
 export type TrackSampler = {
-  getGroundAt: (x: number, z: number) => { y: number; distance: number; t: number }
+  getGroundAt: (x: number, z: number, currentY: number) => { y: number; distance: number; t: number }
 }
 
-const BRIDGE_Y = 1.6
-const BRIDGE_THRESHOLD = 0.5
+export type TrackLandmark = {
+  position: [number, number, number]
+  heading: number
+}
+
+const BRIDGE_Y = 5.2
+export const BRIDGE_THRESHOLD = 1.2
+
+export type CircuitSection = {
+  label: string
+  start: number
+  end: number
+  bridgeOnly?: boolean
+  fallbackLabel?: string
+}
+
+export const CIRCUIT_SECTIONS: CircuitSection[] = [
+  { label: "PIT STRAIGHT", start: 0.985, end: 0.055 },
+  { label: "TURN 1 / TURN 2", start: 0.055, end: 0.16 },
+  { label: "S CURVES", start: 0.16, end: 0.29 },
+  { label: "DUNLOP", start: 0.29, end: 0.345 },
+  { label: "DEGNER", start: 0.345, end: 0.435 },
+  { label: "HAIRPIN", start: 0.435, end: 0.535 },
+  { label: "200R", start: 0.535, end: 0.625 },
+  { label: "SPOON", start: 0.625, end: 0.74 },
+  { label: "BACKSTRETCH / 130R", start: 0.74, end: 0.805 },
+  { label: "CROSSOVER BRIDGE", start: 0.805, end: 0.905, bridgeOnly: true, fallbackLabel: "130R" },
+  { label: "CASIO TRIANGLE", start: 0.905, end: 0.955 },
+  { label: "FINAL CORNER", start: 0.955, end: 0.985 },
+]
+
+function normalizeTrackT(t: number): number {
+  return ((t % 1) + 1) % 1
+}
+
+function isTrackTInRange(t: number, start: number, end: number): boolean {
+  return start <= end ? t >= start && t < end : t >= start || t < end
+}
+
+export function getCircuitSectionAt(t: number, y: number): string {
+  const normalizedT = normalizeTrackT(t)
+  for (const section of CIRCUIT_SECTIONS) {
+    if (!isTrackTInRange(normalizedT, section.start, section.end)) continue
+    if (section.bridgeOnly) return y > BRIDGE_THRESHOLD ? section.label : section.fallbackLabel ?? "DEGNER"
+    return section.label
+  }
+  return "PIT STRAIGHT"
+}
 
 // World-scale constants. The TRACK_POINTS array remains readable at small numbers;
 // SCALE_X/SCALE_Z expand the figure-8 to roughly Suzuka proportions when the curve is built.
@@ -22,71 +68,154 @@ export const SCALE_X = 2.4
 export const SCALE_Z = 2.6
 export const TRACK_HALF_WIDTH = 6.0
 const TRACK_WIDTH = 12.0
-const RUNOFF_WIDTH = 22.0
-const GRAVEL_WIDTH = 15.0
-const SHOULDER_WIDTH = 13.4
+const TRACK_SURFACE_Y_OFFSET = 0.04
+const PAINT_Y_OFFSET = 0.075
+const GROUND_DETAIL_Y_OFFSET = 0.03
+const GROUND_DETAIL_MAX_Y = 0.18
 const KERB_HALF = 6.0
 const WALL_OFF = 6.25
 const PILLAR_OFF = 6.0
+const TUNNEL_WALL_OFFSET = TRACK_HALF_WIDTH + 2.1
+const TUNNEL_WALL_THICKNESS = 0.7
+const TUNNEL_LENGTH = 38
+const TUNNEL_WALL_HEIGHT = 4.35
+const TUNNEL_SOFFIT_Y = BRIDGE_Y - 0.65
 
-// Suzuka-inspired figure-8 layout. The bridge entry/exit ramps use intermediate
-// elevation control points (0.4 / 1.2) to ease the curve up smoothly instead of
-// snapping straight from y=0 to y=1.6.
+const toWorldPosition = (x: number, y: number, z: number): [number, number, number] => [x * SCALE_X, y, z * SCALE_Z]
+
+export const SUZUKA_LANDMARKS: Record<
+  "startFinish" | "turnOneTwo" | "sCurves" | "hairpin" | "spoon" | "casioTriangle",
+  TrackLandmark
+> = {
+  startFinish: { position: toWorldPosition(126, 0, -24), heading: 0.43 },
+  turnOneTwo: { position: toWorldPosition(180, 0, 154), heading: -1.26 },
+  sCurves: { position: toWorldPosition(78, 0, 36), heading: -2.45 },
+  hairpin: { position: toWorldPosition(-26, 0, -84), heading: 1.14 },
+  spoon: { position: toWorldPosition(-240, 0, -96), heading: -0.23 },
+  casioTriangle: { position: toWorldPosition(66, 0, -14), heading: 1.31 },
+}
+
 const TRACK_POINTS: Array<[number, number, number]> = [
-  // Start/finish straight (south side, going east -> +X direction)
-  [-58, 0, 18],
-  [-40, 0, 18],
-  [-22, 0, 18],
-  [-4, 0, 18],
-  [14, 0, 18],
-  // Turn 1 / Turn 2 (right hander, sweeps north)
-  [28, 0, 16],
-  [38, 0, 10],
-  [40, 0, -2],
-  // Esses S-curves (S1-S7) heading west
-  [34, 0, -10],
-  [22, 0, -6],
-  [12, 0, -14],
-  [0, 0, -8],
-  [-10, 0, -16],
-  [-22, 0, -10],
-  // Dunlop curve heading north-west
-  [-32, 0, -16],
-  [-44, 0, -12],
-  // Degner 1
-  [-52, 0, -2],
-  // Degner 2 (start of bridge ramp up)
-  [-46, 0.0, 8],
-  [-42, 0.4, 7],
-  [-38, 1.2, 5.5],
-  // Crossover bridge over the esses (elevated, heading east)
-  [-30, BRIDGE_Y, 4],
-  [-12, BRIDGE_Y, 0],
-  [6, BRIDGE_Y, -2],
-  [22, BRIDGE_Y, -2],
-  // Down ramp from bridge (eased)
-  [30, 1.2, -1],
-  [36, 0.4, 1.5],
-  [40, 0.0, 4],
-  // Hairpin (sharp left)
-  [44, 0, 6],
-  [42, 0, 14],
-  [34, 0, 18],
-  [22, 0, 16],
-  // Spoon curve
-  [10, 0, 22],
-  [-4, 0, 30],
-  [-18, 0, 34],
-  [-32, 0, 32],
-  [-44, 0, 26],
-  // 130R (long left sweeper back to chicane area)
-  [-50, 0, 18],
-  // Casio Triangle chicane
-  [-44, 0, 14],
-  [-46, 0, 12],
-  [-52, 0, 14],
-  [-58, 0, 16],
+  // =========================================================
+  // Start / Finish and Turn 1-2
+  // =========================================================
+
+  // Start / finish, final corner exit onto pit straight
+  [126, 0, -24],
+  [140, 0, 4],
+  [156, 0, 42],
+  [172, 0, 84],
+
+  // Turn 01, first corner entry
+  [184, 0, 116],
+  [188, 0, 138],
+  [180, 0, 154],
+
+  // Turn 02, first corner exit
+  [160, 0, 160],
+  [140, 0, 148],
+  [126, 0, 126],
+
+  // =========================================================
+  // Snake / Esses / Dunlop
+  // =========================================================
+
+  // Turns 03-04, Snake / Esses entry
+  [120, 0, 104],
+  [104, 0, 86],
+  [86, 0, 78],
+
+  // Turns 05-06, middle Snake
+  [72, 0, 58],
+  [78, 0, 36],
+  [62, 0, 18],
+
+  // Turn 07, Dunlop / anti-banked curve
+  [38, 0, 18],
+  [18, 0, 30],
+  [4, 0, 48],
+  [-18, 0, 44],
+
+  // =========================================================
+  // Degner / Hairpin / 200R  --- NO LOOP block
+  // =========================================================
+
+  // Turn 08, Degner 1
+  [-42, 0, 42],
+  [-60, 0, 40],
+
+  // Turn 09, Degner 2
+  [-66, 0, 26],
+  [-68, 0, 8],
+  [-64, 0, -12],
+  [-60, 0, -28],
+
+  // Turn 10, hairpin entry (goes downward)
+  [-56, 0, -44],
+  [-50, 0, -60],
+  [-40, 0, -74],
+
+  // Turn 11, hairpin apex (top of the hook)
+  [-26, 0, -84],
+  [-12, 0, -78],
+  [-8, 0, -64],
+
+  // Turn 12, 200R exit (must go leftward, not curl back)
+  [-18, 0, -50],
+  [-38, 0, -38],
+  [-66, 0, -30],
+  [-96, 0, -26],
+  [-126, 0, -24],
+  [-154, 0, -26],
+  [-180, 0, -38],
+
+  // =========================================================
+  // Spoon
+  // =========================================================
+
+  // Turn 13, Spoon entry
+  [-202, 0, -60],
+  [-222, 0, -86],
+  [-240, 0, -96],
+
+  // Turn 14, Spoon exit
+  [-246, 0, -72],
+  [-238, 0, -44],
+  [-220, 0, -20],
+  [-192, 0, -2],
+  [-156, 0, 8],
+
+  // =========================================================
+  // Backstretch / 130R / Casio
+  // =========================================================
+
+  // Backstretch from Spoon toward 130R
+  [-118, 0, 8],
+  [-82, 0.8, 12],
+  [-48, BRIDGE_Y, 16],
+
+  // Turn 15, 130R / crossover bridge
+  [-16, BRIDGE_Y, 12],
+  [14, BRIDGE_Y, 0],
+  [38, BRIDGE_Y, -18],
+
+  // Turn 16, Casio Triangle entry
+  [58, BRIDGE_Y, -34],
+  [72, 2.8, -28],
+  [66, 0, -14],
+
+  // Turn 17, Casio Triangle exit
+  [82, 0, -10],
+  [102, 0, -18],
+
+  // Turn 18, final corner
+  [118, 0, -24],
+  [130, 0, -24],
 ]
+
+export const SUZUKA_TRACK_POINTS: Array<[number, number, number]> = TRACK_POINTS.map(([x, y, z]) => (
+  toWorldPosition(x, y, z)
+))
 
 type RibbonOptions = {
   curve: THREE.CatmullRomCurve3
@@ -181,8 +310,79 @@ function buildThickRibbon(opts: RibbonOptions): THREE.Mesh {
 
   const mesh = new THREE.Mesh(geo, [topMaterial, sideMaterial])
   mesh.castShadow = true
-  mesh.receiveShadow = true
+  mesh.receiveShadow = false
   return mesh
+}
+
+function buildSurfaceBand(
+  curve: THREE.CatmullRomCurve3,
+  innerOffset: number,
+  outerOffset: number,
+  samples: number,
+  yOffset: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const sampleVerts: Array<{ inner: number; outer: number; valid: boolean }> = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const point = curve.getPoint(t)
+    const tangent = curve.getTangent(t).normalize()
+    const sideX = tangent.z
+    const sideZ = -tangent.x
+
+    if (point.y > GROUND_DETAIL_MAX_Y) {
+      sampleVerts.push({ inner: -1, outer: -1, valid: false })
+      continue
+    }
+
+    const innerIdx = positions.length / 3
+    positions.push(point.x + sideX * innerOffset, point.y + yOffset, point.z + sideZ * innerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 24)
+
+    const outerIdx = positions.length / 3
+    positions.push(point.x + sideX * outerOffset, point.y + yOffset, point.z + sideZ * outerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 24)
+
+    sampleVerts.push({ inner: innerIdx, outer: outerIdx, valid: true })
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = sampleVerts[i]
+    const b = sampleVerts[i + 1]
+    if (!a.valid || !b.valid) continue
+    indices.push(a.inner, b.inner, a.outer, a.outer, b.inner, b.outer)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeBoundingSphere()
+
+  const mesh = new THREE.Mesh(geo, material)
+  mesh.receiveShadow = false
+  return mesh
+}
+
+function addMirroredSurfaceBands(
+  group: THREE.Group,
+  curve: THREE.CatmullRomCurve3,
+  innerOffset: number,
+  outerOffset: number,
+  samples: number,
+  yOffset: number,
+  material: THREE.Material,
+): void {
+  group.add(buildSurfaceBand(curve, innerOffset, outerOffset, samples, yOffset, material))
+  group.add(buildSurfaceBand(curve, -innerOffset, -outerOffset, samples, yOffset, material))
 }
 
 function buildKerbs(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
@@ -219,8 +419,24 @@ function buildKerbs(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
 }
 
 function buildPaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
-  const whiteEdge = new THREE.MeshBasicMaterial({ color: PALETTE.trackWhite, transparent: true, opacity: 0.92 })
-  const yellowDash = new THREE.MeshBasicMaterial({ color: PALETTE.trackYellow, transparent: true, opacity: 0.85 })
+  const whiteEdge = new THREE.MeshBasicMaterial({
+    color: PALETTE.trackWhite,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
+  const yellowDash = new THREE.MeshBasicMaterial({
+    color: PALETTE.trackYellow,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
 
   const samples = 480
 
@@ -236,8 +452,8 @@ function buildPaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): v
       const sz = -tan.x
       const cx = p.x + sx * offset
       const cz = p.z + sz * offset
-      positions.push(cx + sx * 0.09, p.y + 0.022, cz + sz * 0.09)
-      positions.push(cx - sx * 0.09, p.y + 0.022, cz - sz * 0.09)
+      positions.push(cx + sx * 0.09, p.y + PAINT_Y_OFFSET, cz + sz * 0.09)
+      positions.push(cx - sx * 0.09, p.y + PAINT_Y_OFFSET, cz - sz * 0.09)
       normals.push(0, 1, 0, 0, 1, 0)
     }
     for (let i = 0; i < samples; i += 1) {
@@ -261,10 +477,150 @@ function buildPaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): v
     const p = curve.getPoint(t)
     const tan = curve.getTangent(t).normalize()
     const dash = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.7), yellowDash)
-    dash.position.set(p.x, p.y + 0.024, p.z)
+    dash.position.set(p.x, p.y + PAINT_Y_OFFSET, p.z)
     dash.rotation.y = Math.atan2(tan.x, tan.z)
     group.add(dash)
   }
+}
+
+type CrossoverSample = {
+  p: THREE.Vector3
+  tan: THREE.Vector3
+  t: number
+}
+
+type CrossoverInfo = {
+  lower: CrossoverSample
+  upper: CrossoverSample
+  planarDistance: number
+}
+
+function findCrossover(curve: THREE.CatmullRomCurve3): CrossoverInfo | null {
+  const samples = 360
+  const lower: CrossoverSample[] = []
+  const upper: CrossoverSample[] = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const p = curve.getPoint(t)
+    const sample = { p, tan: curve.getTangent(t).normalize(), t }
+    if (p.y <= 0.2) lower.push(sample)
+    if (p.y >= BRIDGE_Y - 0.35) upper.push(sample)
+  }
+
+  let best: CrossoverInfo | null = null
+  lower.forEach((low) => {
+    upper.forEach((high) => {
+      const planarDistance = Math.hypot(low.p.x - high.p.x, low.p.z - high.p.z)
+      if (!best || planarDistance < best.planarDistance) {
+        best = { lower: low, upper: high, planarDistance }
+      }
+    })
+  })
+
+  return best
+}
+
+function createBermGeometry(innerX: number, outerX: number, halfLength: number, highY: number, lowY: number): THREE.BufferGeometry {
+  const positions = [
+    innerX, 0, -halfLength,
+    outerX, 0, -halfLength,
+    outerX, 0, halfLength,
+    innerX, 0, halfLength,
+    innerX, highY, -halfLength,
+    outerX, lowY, -halfLength,
+    outerX, lowY, halfLength,
+    innerX, highY, halfLength,
+  ]
+  const indices = [
+    0, 2, 1, 0, 3, 2,
+    4, 5, 6, 4, 6, 7,
+    0, 1, 5, 0, 5, 4,
+    3, 7, 6, 3, 6, 2,
+    0, 4, 7, 0, 7, 3,
+    1, 2, 6, 1, 6, 5,
+  ]
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  geo.computeBoundingSphere()
+  return geo
+}
+
+function buildCrossoverTunnel(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
+  const crossover = findCrossover(curve)
+  if (!crossover) return
+
+  const tunnel = new THREE.Group()
+  tunnel.name = "CrossoverTunnel"
+  tunnel.position.set(crossover.lower.p.x, 0, crossover.lower.p.z)
+  tunnel.rotation.y = Math.atan2(crossover.lower.tan.x, crossover.lower.tan.z)
+
+  const concreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.86, metalness: 0.04 })
+  const darkConcreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.94, metalness: 0.02 })
+  const earthMat = new THREE.MeshStandardMaterial({ color: PALETTE.grassHill, roughness: 1.0, metalness: 0, flatShading: true, side: THREE.DoubleSide })
+
+  const halfLength = TUNNEL_LENGTH * 0.5
+  const wallY = TUNNEL_WALL_HEIGHT * 0.5 + 0.04
+  ;[-1, 1].forEach((side) => {
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(TUNNEL_WALL_THICKNESS, TUNNEL_WALL_HEIGHT, TUNNEL_LENGTH),
+      concreteMat,
+    )
+    wall.position.set(side * TUNNEL_WALL_OFFSET, wallY, 0)
+    wall.castShadow = true
+    wall.receiveShadow = true
+    tunnel.add(wall)
+
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(TUNNEL_WALL_THICKNESS + 0.04, 0.08, TUNNEL_LENGTH * 0.92),
+      darkConcreteMat,
+    )
+    stripe.position.set(side * TUNNEL_WALL_OFFSET, 1.45, 0)
+    tunnel.add(stripe)
+
+    const innerX = side * (TUNNEL_WALL_OFFSET + TUNNEL_WALL_THICKNESS * 0.5)
+    const outerX = side * (TUNNEL_WALL_OFFSET + TUNNEL_WALL_THICKNESS * 0.5 + 7.0)
+    const berm = new THREE.Mesh(createBermGeometry(innerX, outerX, halfLength + 3, TUNNEL_WALL_HEIGHT * 0.74, 0.28), earthMat)
+    berm.position.y = 0.01
+    berm.receiveShadow = false
+    tunnel.add(berm)
+  })
+
+  const soffitWidth = TUNNEL_WALL_OFFSET * 2 + TUNNEL_WALL_THICKNESS + 1.2
+  const soffit = new THREE.Mesh(
+    new THREE.BoxGeometry(soffitWidth, 0.5, TUNNEL_LENGTH + 5),
+    darkConcreteMat,
+  )
+  soffit.position.set(0, TUNNEL_SOFFIT_Y, 0)
+  soffit.castShadow = true
+  soffit.receiveShadow = true
+  tunnel.add(soffit)
+
+  ;[-1, 1].forEach((end) => {
+    const z = end * (halfLength + 0.45)
+    const lintel = new THREE.Mesh(
+      new THREE.BoxGeometry(soffitWidth + 2.0, 0.82, 0.8),
+      concreteMat,
+    )
+    lintel.position.set(0, TUNNEL_SOFFIT_Y - 0.08, z)
+    lintel.castShadow = true
+    tunnel.add(lintel)
+
+    ;[-1, 1].forEach((side) => {
+      const cheek = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, TUNNEL_WALL_HEIGHT + 0.45, 0.9),
+        concreteMat,
+      )
+      cheek.position.set(side * TUNNEL_WALL_OFFSET, (TUNNEL_WALL_HEIGHT + 0.45) * 0.5, z)
+      cheek.castShadow = true
+      cheek.receiveShadow = true
+      tunnel.add(cheek)
+    })
+  })
+
+  group.add(tunnel)
 }
 
 function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
@@ -272,6 +628,7 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
   const supportMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.85, metalness: 0.05 })
   const wallMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.7, metalness: 0.1 })
   const wallStripeMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.5, metalness: 0.3, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.25 })
+  const crossover = findCrossover(curve)
 
   const samplePoints: { p: THREE.Vector3; tan: THREE.Vector3 }[] = []
   for (let i = 0; i <= samples; i += 1) {
@@ -284,6 +641,7 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
     const sp = samplePoints[i]
     if (sp.p.y < 0.6) continue
     if (i % 7 !== 0) continue
+    if (crossover && Math.hypot(sp.p.x - crossover.upper.p.x, sp.p.z - crossover.upper.p.z) < 22) continue
 
     const sx = sp.tan.z
     const sz = -sp.tan.x
@@ -337,7 +695,7 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
 }
 
 function buildStartFinish(curve: THREE.CatmullRomCurve3, group: THREE.Group): THREE.Vector3 {
-  const startT = 0.02
+  const startT = 0
   const point = curve.getPoint(startT)
   const tangent = curve.getTangent(startT).normalize()
   const sx = tangent.z
@@ -354,7 +712,7 @@ function buildStartFinish(curve: THREE.CatmullRomCurve3, group: THREE.Group): TH
       )
       const lateral = (col - 5) * cellSize
       const longitudinal = (row - 0.5) * cellSize * 0.5
-      cell.position.set(point.x + sx * lateral + tangent.x * longitudinal, point.y + 0.045, point.z + sz * lateral + tangent.z * longitudinal)
+      cell.position.set(point.x + sx * lateral + tangent.x * longitudinal, point.y + PAINT_Y_OFFSET, point.z + sz * lateral + tangent.z * longitudinal)
       cell.rotation.y = Math.atan2(tangent.x, tangent.z)
       checkers.add(cell)
     }
@@ -371,7 +729,7 @@ function buildStartFinish(curve: THREE.CatmullRomCurve3, group: THREE.Group): TH
     ctx.font = "bold 64px sans-serif"
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
-    ctx.fillText("MERCEDES-AMG PETRONAS · SUZUKA", 512, 64)
+    ctx.fillText("MERCEDES-AMG PETRONAS - SUZUKA", 512, 64)
   }
   const bannerTex = new THREE.CanvasTexture(bannerCanvas)
   const banner = new THREE.Mesh(
@@ -408,19 +766,64 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
     zs[i] = p.z
   }
   return {
-    getGroundAt(x: number, z: number) {
-      let bestI = 0
-      let bestD = Number.POSITIVE_INFINITY
+    getGroundAt(x: number, z: number, currentY: number) {
+      let nearestI = 0
+      let nearestD = Number.POSITIVE_INFINITY
       for (let i = 0; i < samples; i += 1) {
         const dx = xs[i] - x
         const dz = zs[i] - z
-        const d = dx * dx + dz * dz
-        if (d < bestD) {
-          bestD = d
+        const d = Math.sqrt(dx * dx + dz * dz)
+        if (d < nearestD) {
+          nearestD = d
+          nearestI = i
+        }
+      }
+
+      let bestI = nearestI
+      let bestScore = Number.POSITIVE_INFINITY
+      let groundI = -1
+      let groundD = Number.POSITIVE_INFINITY
+      let bridgeI = -1
+      let bridgeD = Number.POSITIVE_INFINITY
+      for (let i = 0; i < samples; i += 1) {
+        const dx = xs[i] - x
+        const dz = zs[i] - z
+        const planarD = Math.sqrt(dx * dx + dz * dz)
+        if (planarD > nearestD + TRACK_HALF_WIDTH) continue
+
+        if (ys[i] <= BRIDGE_THRESHOLD && planarD < groundD) {
+          groundD = planarD
+          groundI = i
+        }
+        if (ys[i] > BRIDGE_THRESHOLD && planarD < bridgeD) {
+          bridgeD = planarD
+          bridgeI = i
+        }
+
+        const yDelta = Math.abs(ys[i] - currentY)
+        const score = yDelta * 12 + planarD * 0.02
+        if (score < bestScore) {
+          bestScore = score
           bestI = i
         }
       }
-      return { y: ys[bestI], distance: Math.sqrt(bestD), t: bestI / samples }
+
+      const nearestIsBridge = ys[nearestI] > BRIDGE_THRESHOLD
+      const lowerIsUsable = groundI >= 0 && groundD <= TRACK_HALF_WIDTH + 1.0
+      const bridgeIsUsable = bridgeI >= 0 && bridgeD <= TRACK_HALF_WIDTH + 1.0
+      if (currentY < 0.35 && lowerIsUsable) {
+        bestI = groundI
+      } else if (currentY < 1.4 && lowerIsUsable) {
+        bestI = groundI
+      } else if (bridgeIsUsable && (nearestIsBridge || currentY > 0.65 || !lowerIsUsable || bridgeD + 1.0 < groundD)) {
+        bestI = bridgeI
+      } else if (lowerIsUsable) {
+        bestI = groundI
+      }
+
+      const dx = xs[bestI] - x
+      const dz = zs[bestI] - z
+      return { y: ys[bestI], distance: Math.sqrt(dx * dx + dz * dz), t: bestI / samples }
     },
   }
 }
@@ -430,9 +833,9 @@ export function buildSuzukaTrack(): TrackSystem {
   group.name = "SuzukaTrack"
 
   const curve = new THREE.CatmullRomCurve3(
-    TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x * SCALE_X, y, z * SCALE_Z)),
+    SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     true,
-    "catmullrom",
+    "centripetal",
     0.5,
   )
 
@@ -440,69 +843,38 @@ export function buildSuzukaTrack(): TrackSystem {
   const concreteSideMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.85, metalness: 0.05 })
   const concreteUnderMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.95, metalness: 0.0 })
 
-  const runOffMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltRunoff, roughness: 0.95, metalness: 0.0 })
-  const runOff = buildThickRibbon({
-    curve,
-    width: RUNOFF_WIDTH,
-    samples: 600,
-    yOffset: 0.005,
-    thickness: 0.05,
-    topMaterial: runOffMat,
-    sideMaterial: runOffMat,
-    clipBridge: true,
-  })
-  group.add(runOff)
+  const groundBandSide = THREE.DoubleSide
+  const gravelMat = new THREE.MeshStandardMaterial({ color: PALETTE.gravel, roughness: 0.98, metalness: 0.0, side: groundBandSide })
+  const runOffMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltRunoff, roughness: 0.94, metalness: 0.0, side: groundBandSide })
+  const shoulderMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltDark, roughness: 0.95, metalness: 0.0, side: groundBandSide })
 
-  const gravelMat = new THREE.MeshStandardMaterial({ color: PALETTE.gravel, roughness: 0.97, metalness: 0.0 })
-  const gravel = buildThickRibbon({
-    curve,
-    width: GRAVEL_WIDTH,
-    samples: 600,
-    yOffset: 0.012,
-    thickness: 0.08,
-    topMaterial: gravelMat,
-    sideMaterial: gravelMat,
-    clipBridge: true,
-  })
-  group.add(gravel)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 0.35, TRACK_HALF_WIDTH + 1.7, 600, GROUND_DETAIL_Y_OFFSET + 0.012, shoulderMat)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 1.95, TRACK_HALF_WIDTH + 4.8, 600, GROUND_DETAIL_Y_OFFSET + 0.006, runOffMat)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 5.1, TRACK_HALF_WIDTH + 6.7, 600, GROUND_DETAIL_Y_OFFSET, gravelMat)
 
   // Main asphalt deck (thick so the bridge has a visible solid underside)
   const trackTopMat = new THREE.MeshStandardMaterial({
     color: PALETTE.asphalt,
     roughness: 0.85,
     metalness: 0.0,
-    emissive: new THREE.Color(PALETTE.asphaltDark),
-    emissiveIntensity: 0.18,
+    emissive: new THREE.Color("#0b0c0d"),
+    emissiveIntensity: 0.36,
   })
   const trackMesh = buildThickRibbon({
     curve,
     width: TRACK_WIDTH,
     samples: 800,
-    yOffset: 0.04,
-    thickness: 0.55,
+    yOffset: TRACK_SURFACE_Y_OFFSET,
+    thickness: 0.85,
     topMaterial: trackTopMat,
     sideMaterial: concreteSideMat,
   })
   group.add(trackMesh)
 
-  // Optional: a slightly wider, flat asphalt "shoulder" mesh that tucks under the
-  // track edges on ground sections so the painted white edge doesn't visually float.
-  const shoulderMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltDark, roughness: 0.95, metalness: 0.0 })
-  const shoulder = buildThickRibbon({
-    curve,
-    width: SHOULDER_WIDTH,
-    samples: 600,
-    yOffset: 0.018,
-    thickness: 0.06,
-    topMaterial: shoulderMat,
-    sideMaterial: shoulderMat,
-    clipBridge: true,
-  })
-  group.add(shoulder)
-
   buildPaintedLines(curve, group)
   buildKerbs(curve, group)
   buildBridgeSupports(curve, group)
+  buildCrossoverTunnel(curve, group)
   const startFinish = buildStartFinish(curve, group)
 
   void concreteUnderMat

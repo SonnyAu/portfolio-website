@@ -4,13 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { gsap } from "gsap"
 import * as THREE from "three"
 import { buildScene, type SceneRig } from "./f1/scene/buildScene"
+import { BRIDGE_THRESHOLD, getCircuitSectionAt, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS } from "./f1/scene/track"
 import type { Station } from "./f1/scene/stations"
 
 type Telemetry = {
   speed: number
   gear: number
   rpm: number
-  sector: string
+  section: string
+  trackT: number
+  carX: number
+  carY: number
+  carZ: number
 }
 
 type CarState = {
@@ -22,21 +27,99 @@ type CarState = {
   steering: number
 }
 
-const SECTOR_NAMES = ["PIT STRAIGHT", "ESSES", "DUNLOP", "HAIRPIN", "SPOON", "130R", "CHICANE"]
+const START_GRID = SUZUKA_LANDMARKS.startFinish
+const MINIMAP_WIDTH = 236
+const MINIMAP_HEIGHT = 132
+const MINIMAP_PAD = 10
+
+const MINIMAP_SAMPLES = (() => {
+  const curve = new THREE.CatmullRomCurve3(
+    SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    true,
+    "centripetal",
+    0.5,
+  )
+  const samples: Array<{ x: number; y: number; z: number; t: number }> = []
+  for (let i = 0; i <= 220; i += 1) {
+    const t = i / 220
+    const point = curve.getPoint(t)
+    samples.push({ x: point.x, y: point.y, z: point.z, t })
+  }
+  return samples
+})()
+
+const MINIMAP_BOUNDS = MINIMAP_SAMPLES.reduce(
+  (bounds, point) => ({
+    minX: Math.min(bounds.minX, point.x),
+    maxX: Math.max(bounds.maxX, point.x),
+    minZ: Math.min(bounds.minZ, point.z),
+    maxZ: Math.max(bounds.maxZ, point.z),
+  }),
+  { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, minZ: Number.POSITIVE_INFINITY, maxZ: Number.NEGATIVE_INFINITY },
+)
+
+const MINIMAP_SCALE = Math.min(
+  (MINIMAP_WIDTH - MINIMAP_PAD * 2) / Math.max(1, MINIMAP_BOUNDS.maxX - MINIMAP_BOUNDS.minX),
+  (MINIMAP_HEIGHT - MINIMAP_PAD * 2) / Math.max(1, MINIMAP_BOUNDS.maxZ - MINIMAP_BOUNDS.minZ),
+)
+
+const projectMinimapPoint = (x: number, z: number): { x: number; y: number } => ({
+  x: MINIMAP_PAD + (x - MINIMAP_BOUNDS.minX) * MINIMAP_SCALE,
+  y: MINIMAP_HEIGHT - MINIMAP_PAD - (z - MINIMAP_BOUNDS.minZ) * MINIMAP_SCALE,
+})
+
+const pointsToPolyline = (points: Array<{ x: number; z: number }>): string => (
+  points.map((point) => {
+    const projected = projectMinimapPoint(point.x, point.z)
+    return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`
+  }).join(" ")
+)
+
+const MINIMAP_TRACK_POLYLINE = pointsToPolyline(MINIMAP_SAMPLES)
+const MINIMAP_BRIDGE_POLYLINE = pointsToPolyline(MINIMAP_SAMPLES.filter((point) => point.y > BRIDGE_THRESHOLD))
+const MINIMAP_START = projectMinimapPoint(SUZUKA_LANDMARKS.startFinish.position[0], SUZUKA_LANDMARKS.startFinish.position[2])
+const DRIVE_BOUNDS_MARGIN = 90
+const DRIVE_BOUNDS = {
+  minX: MINIMAP_BOUNDS.minX - DRIVE_BOUNDS_MARGIN,
+  maxX: MINIMAP_BOUNDS.maxX + DRIVE_BOUNDS_MARGIN,
+  minZ: MINIMAP_BOUNDS.minZ - DRIVE_BOUNDS_MARGIN,
+  maxZ: MINIMAP_BOUNDS.maxZ + DRIVE_BOUNDS_MARGIN,
+}
 
 export default function F1TrackPortfolio() {
   const mountRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const [activeStation, setActiveStation] = useState<Station | null>(null)
   const [stationsList, setStationsList] = useState<Station[]>([])
-  const [telemetry, setTelemetry] = useState<Telemetry>({ speed: 0, gear: 1, rpm: 1200, sector: "PIT" })
+  const [telemetry, setTelemetry] = useState<Telemetry>({
+    speed: 0,
+    gear: 1,
+    rpm: 1200,
+    section: "PIT STRAIGHT",
+    trackT: 0,
+    carX: START_GRID.position[0],
+    carY: START_GRID.position[1],
+    carZ: START_GRID.position[2],
+  })
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSceneReady, setIsSceneReady] = useState(false)
   const keys = useRef<Record<string, boolean>>({})
-  // Initial position lines up with the start/finish straight at world scale (SCALE_X=2.4, SCALE_Z=2.6).
-  const carState = useRef<CarState>({ x: -135, y: 0, z: 47, heading: Math.PI / 2, velocity: 0, steering: 0 })
+  const carState = useRef<CarState>({
+    x: START_GRID.position[0],
+    y: START_GRID.position[1],
+    z: START_GRID.position[2],
+    heading: START_GRID.heading,
+    velocity: 0,
+    steering: 0,
+  })
   const activeStationRef = useRef<Station | null>(activeStation)
   const stationsRef = useRef<Station[]>([])
+  const minimapCar = projectMinimapPoint(telemetry.carX, telemetry.carZ)
+  const minimapStations = useMemo(() => stationsList.map((station) => ({
+    id: station.id,
+    accent: station.accent,
+    ...projectMinimapPoint(station.position[0], station.position[2]),
+  })), [stationsList])
 
   const nearestStation = useCallback((x: number, z: number) => {
     const list = stationsRef.current
@@ -68,10 +151,11 @@ export default function F1TrackPortfolio() {
 
   const jumpToStation = useCallback((station: Station) => {
     const [x, , z] = station.position
-    carState.current.x = x - 2.5
-    carState.current.z = z + 1.8
-    carState.current.y = 0
+    carState.current.x = x
+    carState.current.z = z
+    carState.current.y = station.position[1]
     carState.current.velocity = 0
+    carState.current.steering = 0
     revealStation(station)
   }, [revealStation])
 
@@ -125,7 +209,7 @@ export default function F1TrackPortfolio() {
       return
     }
 
-    const { scene, renderer, camera, environment, stations, car, carGlow, track } = rig
+    const { renderer, camera, environment, stations, car, carGlow, track } = rig
     stationsRef.current = stations
     setStationsList(stations)
 
@@ -181,14 +265,16 @@ export default function F1TrackPortfolio() {
 
       state.x += Math.sin(state.heading) * state.velocity * delta
       state.z += Math.cos(state.heading) * state.velocity * delta
-      state.x = Math.max(-380, Math.min(380, state.x))
-      state.z = Math.max(-380, Math.min(380, state.z))
+      state.x = THREE.MathUtils.clamp(state.x, DRIVE_BOUNDS.minX, DRIVE_BOUNDS.maxX)
+      state.z = THREE.MathUtils.clamp(state.z, DRIVE_BOUNDS.minZ, DRIVE_BOUNDS.maxZ)
 
       // Track-following Y elevation: drive up the ramp onto the bridge, drop back to ground when off it.
-      const ground = sampler.getGroundAt(state.x, state.z)
+      const ground = sampler.getGroundAt(state.x, state.z, state.y)
       const onTrack = ground.distance < trackHalfWidth + 0.5
       const targetY = onTrack ? ground.y : 0
-      state.y += (targetY - state.y) * Math.min(1, 8 * delta)
+      const climbingRamp = targetY > state.y + 0.08
+      const yFollowRate = targetY > 0.5 || state.y > 0.5 ? (climbingRamp ? 34 : 24) : 10
+      state.y += (targetY - state.y) * Math.min(1, yFollowRate * delta)
 
       // Soft grass slowdown: exponential drag scales with how far off the track we are.
       const offTrackBy = Math.max(0, ground.distance - trackHalfWidth)
@@ -265,16 +351,19 @@ export default function F1TrackPortfolio() {
 
       if (time - lastTelemetryRender > 110) {
         lastTelemetryRender = time
-        const sectorIndex = Math.floor((time / 3000) % SECTOR_NAMES.length)
         setTelemetry({
           speed: Math.round(Math.abs(state.velocity) * 6.5),
           gear: Math.max(1, Math.min(8, Math.ceil(Math.abs(state.velocity) / 7))),
           rpm: Math.round(1200 + Math.abs(state.velocity) * 360),
-          sector: SECTOR_NAMES[sectorIndex],
+          section: getCircuitSectionAt(ground.t, state.y),
+          trackT: ground.t,
+          carX: state.x,
+          carY: state.y,
+          carZ: state.z,
         })
       }
 
-      renderer.render(scene, camera)
+      renderer.render(rig.scene, camera)
       animationFrame = requestAnimationFrame(animate)
     }
 
@@ -299,7 +388,7 @@ export default function F1TrackPortfolio() {
 
       <header className="absolute left-0 right-0 top-0 z-20 flex flex-col gap-4 p-4 md:flex-row md:items-start md:justify-between md:p-8">
         <div className="max-w-4xl rounded-3xl border border-[#00D2BE]/25 bg-black/55 p-5 shadow-2xl shadow-[#00D2BE]/10 backdrop-blur-xl md:p-6">
-          <p className="text-[10px] uppercase tracking-[0.45em] text-[#00D2BE]">Mercedes-AMG W15 · Stylized Suzuka · Golden hour Japan</p>
+          <p className="text-[10px] uppercase tracking-[0.45em] text-[#00D2BE]">Mercedes-AMG W15 - Stylized Suzuka - Golden hour Japan</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-black uppercase leading-none tracking-[-0.06em] text-white md:text-7xl">
             Drive the circuit.
           </h1>
@@ -308,12 +397,31 @@ export default function F1TrackPortfolio() {
           </p>
         </div>
 
-        <div className="grid min-w-[250px] grid-cols-3 gap-2 rounded-3xl border border-white/10 bg-black/65 p-3 font-mono text-xs uppercase shadow-2xl backdrop-blur-xl">
-          <div><span className="block text-neutral-500">Speed</span><strong className="text-xl text-[#00D2BE]">{telemetry.speed}</strong></div>
-          <div><span className="block text-neutral-500">Gear</span><strong className="text-xl text-white">{telemetry.gear}</strong></div>
-          <div><span className="block text-neutral-500">RPM</span><strong className="text-xl text-[#00D2BE]">{telemetry.rpm}</strong></div>
-          <div className="col-span-3 h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00D2BE] transition-[width]" style={{ width: `${Math.min(100, telemetry.rpm / 210)}%` }} /></div>
-          <div className="col-span-3 text-right text-[10px] tracking-[0.28em] text-neutral-400">SECTOR · {telemetry.sector}</div>
+        <div className="w-[300px] rounded-3xl border border-white/10 bg-black/70 p-3 font-mono text-xs uppercase shadow-2xl backdrop-blur-xl">
+          <div className="grid grid-cols-3 gap-2">
+            <div><span className="block text-neutral-500">Speed</span><strong className="text-xl text-[#00D2BE]">{telemetry.speed}</strong></div>
+            <div><span className="block text-neutral-500">Gear</span><strong className="text-xl text-white">{telemetry.gear}</strong></div>
+            <div><span className="block text-neutral-500">RPM</span><strong className="text-xl text-[#00D2BE]">{telemetry.rpm}</strong></div>
+          </div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full bg-[#00D2BE] transition-[width]" style={{ width: `${Math.min(100, telemetry.rpm / 210)}%` }} />
+          </div>
+          <svg
+            className="mt-3 h-[132px] w-full overflow-visible"
+            viewBox={`0 0 ${MINIMAP_WIDTH} ${MINIMAP_HEIGHT}`}
+            role="img"
+            aria-label="Live Suzuka circuit minimap"
+          >
+            <polyline points={MINIMAP_TRACK_POLYLINE} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={MINIMAP_TRACK_POLYLINE} fill="none" stroke="#111820" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={MINIMAP_BRIDGE_POLYLINE} fill="none" stroke="#00D2BE" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1={MINIMAP_START.x - 4} y1={MINIMAP_START.y} x2={MINIMAP_START.x + 4} y2={MINIMAP_START.y} stroke="#f5f5f5" strokeWidth="2" />
+            {minimapStations.map((station) => (
+              <circle key={station.id} cx={station.x} cy={station.y} r="2.1" fill={station.accent} opacity="0.86" />
+            ))}
+            <circle cx={minimapCar.x} cy={minimapCar.y} r="4.2" fill={telemetry.carY > BRIDGE_THRESHOLD ? "#ffd84d" : "#00D2BE"} stroke="#ffffff" strokeWidth="1.2" />
+          </svg>
+          <div className="mt-1 text-right text-[10px] tracking-[0.28em] text-neutral-400">SECTION - {telemetry.section}</div>
         </div>
       </header>
 
@@ -341,7 +449,7 @@ export default function F1TrackPortfolio() {
       </aside>
 
       <div className="absolute bottom-4 left-4 z-10 hidden rounded-full border border-white/10 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-neutral-300 backdrop-blur md:block">
-        Controls: W accelerate · S brake/reverse · A/D steer · Space slow · stop in a glowing zone to open a modal
+        Controls: W accelerate - S brake/reverse - A/D steer - Space slow - stop in a glowing zone to open a modal
       </div>
 
       <div className="absolute left-4 top-1/2 z-10 hidden -translate-y-1/2 flex-col gap-2 md:flex">

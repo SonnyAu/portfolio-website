@@ -1,11 +1,13 @@
 import * as THREE from "three"
 import { gsap } from "gsap"
 import { PALETTE } from "./palette"
+import { SUZUKA_LANDMARKS } from "./track"
 
 export type Station = {
   id: string
   label: string
   title: string
+  cornerName: string
   short: string
   details: string[]
   position: [number, number, number]
@@ -13,58 +15,61 @@ export type Station = {
   zoneRadius: number
 }
 
-// Station positions follow the world scale used in track.ts (SCALE_X = 2.4, SCALE_Z = 2.6).
-// Inlined as final coordinates for clarity.
 export const STATIONS: Station[] = [
   {
     id: "about",
     label: "01 / ABOUT",
     title: "Driver Profile",
+    cornerName: "TURN 1 / TURN 2",
     short: "SJSU CS engineer building fast, polished full-stack products.",
     details: ["President's Scholar mindset", "React Native + AI specialist", "Product-focused startup builder"],
-    position: [22 * 2.4, 0, 16 * 2.6],
+    position: SUZUKA_LANDMARKS.turnOneTwo.position,
     accent: PALETTE.mercedesTeal,
-    zoneRadius: 9.0,
+    zoneRadius: 7.8,
   },
   {
     id: "experience",
     label: "02 / EXPERIENCE",
     title: "Race History",
+    cornerName: "S CURVES",
     short: "Frontend React Developer Intern experience with major performance wins.",
     details: ["GBCS Group internship", "Performance-focused UI systems", "Cross-functional engineering delivery"],
-    position: [38 * 2.4, 0, -2 * 2.6],
+    position: SUZUKA_LANDMARKS.sCurves.position,
     accent: PALETTE.silver,
-    zoneRadius: 8.8,
+    zoneRadius: 7.6,
   },
   {
     id: "skills",
     label: "03 / SKILLS",
     title: "Engineering Setup",
+    cornerName: "HAIRPIN",
     short: "Next.js, TypeScript, Tailwind, React Native, Python, ML, and cloud tools.",
     details: ["Frontend systems", "Mobile apps", "ML-backed product features"],
-    position: [-18 * 2.4, 0, 34 * 2.6],
+    position: SUZUKA_LANDMARKS.hairpin.position,
     accent: PALETTE.petronasGreen,
-    zoneRadius: 9.4,
+    zoneRadius: 7.9,
   },
   {
     id: "projects",
     label: "04 / PROJECTS",
     title: "Pit Garage",
+    cornerName: "SPOON CURVE",
     short: "PalAte and selected product builds staged around the circuit.",
     details: ["PalAte co-founder", "Food-tech product launch", "Portfolio-ready demos"],
-    position: [-46 * 2.4, 0, 8 * 2.6],
+    position: SUZUKA_LANDMARKS.spoon.position,
     accent: PALETTE.kerbRed,
-    zoneRadius: 9.5,
+    zoneRadius: 8.0,
   },
   {
     id: "contact",
     label: "05 / CONTACT",
     title: "Finish Straight",
+    cornerName: "CASIO TRIANGLE",
     short: "Ready for internships, early-career software roles, and ambitious builds.",
     details: ["Open to collaboration", "Bay Area / remote", "Let's ship something fast"],
-    position: [-58 * 2.4, 0, 18 * 2.6],
+    position: SUZUKA_LANDMARKS.casioTriangle.position,
     accent: PALETTE.kerbWhite,
-    zoneRadius: 8.6,
+    zoneRadius: 7.7,
   },
 ]
 
@@ -167,7 +172,7 @@ export function buildStations(scene: THREE.Scene): { group: THREE.Group; station
     beacon.add(column)
 
     // Floating label
-    const sprite = createTextSprite(station.title, station.accent)
+    const sprite = createTextSprite(station.cornerName, station.accent)
     sprite.position.y = 6
     beacon.add(sprite)
 

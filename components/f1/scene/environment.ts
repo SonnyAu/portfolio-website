@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { PALETTE } from "./palette"
+import { SCALE_X, SCALE_Z, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS } from "./track"
 
 export type Collider = { x: number; z: number; radius: number }
 
@@ -16,6 +17,83 @@ export type PetalSystem = {
   update: (delta: number) => void
 }
 
+const TRACK_CLEARANCE_SAMPLES = (() => {
+  const curve = new THREE.CatmullRomCurve3(
+    SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    true,
+    "centripetal",
+    0.5,
+  )
+  const samples: THREE.Vector3[] = []
+  for (let i = 0; i < 420; i += 1) {
+    samples.push(curve.getPoint(i / 420))
+  }
+  return samples
+})()
+
+function distanceToTrackXZ(x: number, z: number): number {
+  let best = Number.POSITIVE_INFINITY
+  for (const p of TRACK_CLEARANCE_SAMPLES) {
+    const distance = Math.hypot(p.x - x, p.z - z)
+    if (distance < best) best = distance
+  }
+  return best
+}
+
+const MAIN_STRAIGHT_YAW = 1.2
+const MAIN_STRAIGHT_HEADING = 2.77
+const yawFromHeading = (heading: number) => heading - Math.PI / 2
+const toWorldXZ = (x: number, z: number): THREE.Vector3 => new THREE.Vector3(x * SCALE_X, 0, z * SCALE_Z)
+const tracksidePosition = (x: number, z: number, heading: number, offset: number): THREE.Vector3 => {
+  const pos = toWorldXZ(x, z)
+  pos.x += -Math.cos(heading) * offset
+  pos.z += Math.sin(heading) * offset
+  return pos
+}
+
+const PIT_COMPLEX_POS = tracksidePosition(150, 12, MAIN_STRAIGHT_HEADING, -38)
+const MAIN_STRAIGHT_STANDS_POS = tracksidePosition(148, 16, MAIN_STRAIGHT_HEADING, 92)
+const FIRST_TURN_STANDS_POS = tracksidePosition(146, -78, -1.0, 92)
+const S_CURVE_STANDS_POS = tracksidePosition(34, -42, -1.92, 92)
+const HAIRPIN_STANDS_POS = tracksidePosition(92, 118, -0.33, -110)
+const SPOON_STANDS_POS = tracksidePosition(-166, 158, 3.08, -112)
+const CASIO_STANDS_POS = tracksidePosition(170, 58, 2.71, -108)
+const FERRIS_WHEEL_POS = new THREE.Vector3(540, 13, 240)
+const PAGODA_GARDEN_POS = new THREE.Vector3(-342, 0, -256)
+const TORII_PLAZA_POS = new THREE.Vector3(500, 0, -260)
+
+const SCENERY_CLEARINGS = [
+  { x: FERRIS_WHEEL_POS.x, z: FERRIS_WHEEL_POS.z, inner: 34, outer: 78 },
+  { x: PAGODA_GARDEN_POS.x, z: PAGODA_GARDEN_POS.z, inner: 36, outer: 86 },
+  { x: TORII_PLAZA_POS.x, z: TORII_PLAZA_POS.z, inner: 18, outer: 52 },
+]
+
+function sceneryClearingFactor(x: number, z: number): number {
+  let factor = 1
+  for (const clearing of SCENERY_CLEARINGS) {
+    const distance = Math.hypot(x - clearing.x, z - clearing.z)
+    factor = Math.min(factor, THREE.MathUtils.smoothstep(distance, clearing.inner, clearing.outer))
+  }
+  return factor
+}
+
+function addRotatedCollider(
+  colliders: Collider[],
+  center: THREE.Vector3,
+  yaw: number,
+  localX: number,
+  localZ: number,
+  radius: number,
+): void {
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  colliders.push({
+    x: center.x + localX * c + localZ * s,
+    z: center.z - localX * s + localZ * c,
+    radius,
+  })
+}
+
 function buildGround(group: THREE.Group): void {
   const geo = new THREE.PlaneGeometry(1400, 1400, 110, 110)
   geo.rotateX(-Math.PI / 2)
@@ -29,11 +107,13 @@ function buildGround(group: THREE.Group): void {
     const z = positions.getZ(i)
     const distFromCenter = Math.hypot(x, z)
     const flatZone = THREE.MathUtils.smoothstep(distFromCenter, 160, 320)
+    const trackClearance = THREE.MathUtils.smoothstep(distanceToTrackXZ(x, z), 44, 96)
+    const sceneryClearance = sceneryClearingFactor(x, z)
     const noise =
       Math.sin(x * 0.012 + z * 0.016) * 1.4 +
       Math.cos(x * 0.028 - z * 0.02) * 0.8 +
       Math.sin(x * 0.005 + z * 0.0075) * 4.4
-    const y = flatZone * Math.max(noise, 0)
+    const y = flatZone * trackClearance * sceneryClearance * Math.max(noise, 0)
     positions.setY(i, y - 0.05)
 
     const tint = THREE.MathUtils.clamp(y / 5, 0, 1)
@@ -43,9 +123,9 @@ function buildGround(group: THREE.Group): void {
   geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
   geo.computeVertexNormals()
 
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.0, flatShading: true })
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0.0, flatShading: false })
   const ground = new THREE.Mesh(geo, mat)
-  ground.receiveShadow = true
+  ground.receiveShadow = false
   group.add(ground)
 }
 
@@ -132,16 +212,16 @@ function buildToriiInstance(parent: THREE.Group): THREE.Group {
 
 function buildTorii(group: THREE.Group, colliders: Collider[]): void {
   const torii1 = buildToriiInstance(group)
-  const t1Pos = new THREE.Vector3(-176, 0, 56)
+  const t1Pos = new THREE.Vector3(-220, 0, 90)
   torii1.position.copy(t1Pos)
   torii1.rotation.y = Math.PI / 2
-  // Pillars are along world X axis but rotated 90deg, so columns are at world (t1Pos.x, t1Pos.z ± 3.6)
+  // Pillars are along world X axis but rotated 90deg, so columns sit at +/-3.6z.
   ;[-3.6, 3.6].forEach((off) => {
     colliders.push({ x: t1Pos.x, z: t1Pos.z + off, radius: 1.4 })
   })
 
   const torii2 = buildToriiInstance(group)
-  const t2Pos = new THREE.Vector3(138, 0, 92)
+  const t2Pos = TORII_PLAZA_POS.clone()
   torii2.position.copy(t2Pos)
   torii2.rotation.y = -Math.PI / 6
   torii2.scale.setScalar(0.7)
@@ -192,7 +272,16 @@ function buildPagoda(group: THREE.Group, colliders: Collider[]): void {
   finial.position.y = baseY + 1.3
   pagoda.add(finial)
 
-  const pagodaPos = new THREE.Vector3(-208, 0, -110)
+  const pagodaPos = PAGODA_GARDEN_POS.clone()
+  const gardenPad = new THREE.Mesh(
+    new THREE.CylinderGeometry(32, 36, 0.08, 10),
+    new THREE.MeshStandardMaterial({ color: PALETTE.grassHill, roughness: 0.95, flatShading: true }),
+  )
+  gardenPad.position.set(pagodaPos.x, 0.03, pagodaPos.z)
+  gardenPad.rotation.y = Math.PI / 10
+  gardenPad.receiveShadow = true
+  group.add(gardenPad)
+
   pagoda.position.copy(pagodaPos)
   pagoda.scale.setScalar(1.6)
   group.add(pagoda)
@@ -214,6 +303,7 @@ function buildSakuraTrees(group: THREE.Group): void {
     const x = Math.cos(angle) * ring
     const z = Math.sin(angle) * ring * 0.78
     if (Math.hypot(x, z) < 170) continue
+    if (distanceToTrackXZ(x, z) < 58) continue
     positions.push({ x, z, scale: 0.9 + rand() * 1.4, rot: rand() * Math.PI * 2, tint: rand() })
   }
 
@@ -260,20 +350,21 @@ function buildSakuraTrees(group: THREE.Group): void {
 function buildPaddyTerraces(group: THREE.Group): void {
   const colors = [PALETTE.paddyGreen1, PALETTE.paddyGreen2, PALETTE.paddyGreen3]
   const tiers = [
-    { x: 192, z: -130, w: 78, d: 50, tier: 0 },
-    { x: 192, z: -130, w: 65, d: 40, tier: 1 },
-    { x: 192, z: -130, w: 52, d: 32, tier: 2 },
-    { x: -264, z: 156, w: 92, d: 56, tier: 0 },
-    { x: -264, z: 156, w: 74, d: 46, tier: 1 },
-    { x: 228, z: 208, w: 72, d: 40, tier: 0 },
-    { x: 228, z: 208, w: 56, d: 32, tier: 1 },
+    { x: 320, z: -250, w: 78, d: 50, tier: 0 },
+    { x: 320, z: -250, w: 65, d: 40, tier: 1 },
+    { x: 320, z: -250, w: 52, d: 32, tier: 2 },
+    { x: -300, z: 190, w: 92, d: 56, tier: 0 },
+    { x: -300, z: 190, w: 74, d: 46, tier: 1 },
+    { x: 250, z: 250, w: 72, d: 40, tier: 0 },
+    { x: 250, z: 250, w: 56, d: 32, tier: 1 },
   ]
   tiers.forEach((t) => {
-    const mat = new THREE.MeshStandardMaterial({ color: colors[t.tier % colors.length], roughness: 0.95, flatShading: true })
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(t.w, 0.7 + t.tier * 0.5, t.d), mat)
-    mesh.position.set(t.x, 0.35 + t.tier * 0.5, t.z)
-    mesh.castShadow = true
-    mesh.receiveShadow = true
+    const mat = new THREE.MeshStandardMaterial({ color: colors[t.tier % colors.length], roughness: 1.0, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(t.w, t.d), mat)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.set(t.x, 0.018 + t.tier * 0.006, t.z)
+    mesh.castShadow = false
+    mesh.receiveShadow = false
     group.add(mesh)
   })
 }
@@ -332,7 +423,7 @@ function buildFerrisWheel(group: THREE.Group, colliders: Collider[]): THREE.Grou
 
   const wheelHolder = new THREE.Group()
   wheelHolder.add(wheel)
-  const wheelPos = new THREE.Vector3(175, 13, 180)
+  const wheelPos = FERRIS_WHEEL_POS.clone()
   wheelHolder.position.copy(wheelPos)
 
   const legMat = new THREE.MeshStandardMaterial({ color: "#3a3a3e", roughness: 0.5, metalness: 0.6 })
@@ -349,76 +440,262 @@ function buildFerrisWheel(group: THREE.Group, colliders: Collider[]): THREE.Grou
   return wheel
 }
 
-function buildGrandstands(group: THREE.Group, colliders: Collider[]): void {
-  const seatMat = new THREE.MeshStandardMaterial({ color: "#2a2e30", roughness: 0.7 })
-  const accentMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.5, metalness: 0.4, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.1 })
+type StandSpec = {
+  name: string
+  position: THREE.Vector3
+  yaw: number
+  width: number
+  rows: number
+  depthSign: 1 | -1
+  covered?: boolean
+  screen?: boolean
+}
 
-  const standCenterX = -54
-  const standBaseZ = 78
-  const standWidth = 60
-  for (let row = 0; row < 6; row += 1) {
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(standWidth, 0.7, 1.6), seatMat)
-    stand.position.set(standCenterX, 0.6 + row * 0.7, standBaseZ + row * 1.5)
-    stand.castShadow = true
-    stand.receiveShadow = true
-    group.add(stand)
-  }
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(standWidth + 2, 0.4, 11), accentMat)
-  roof.position.set(standCenterX, 6.7, standBaseZ + 5)
-  group.add(roof)
-  ;[-(standWidth / 2 - 2), standWidth / 2 - 2].forEach((x) => {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7, 0.4), seatMat)
-    post.position.set(standCenterX + x, 3.5, standBaseZ + 3)
-    group.add(post)
+function buildStandUnit(spec: StandSpec, colliders: Collider[]): THREE.Group {
+  const stand = new THREE.Group()
+  stand.name = `Grandstand_${spec.name}`
+
+  const seatMat = new THREE.MeshStandardMaterial({ color: "#2a2e30", roughness: 0.74 })
+  const riserMat = new THREE.MeshStandardMaterial({ color: "#171a1d", roughness: 0.88 })
+  const roofMat = new THREE.MeshStandardMaterial({ color: "#3f4648", roughness: 0.58, metalness: 0.28 })
+  const screenMat = new THREE.MeshStandardMaterial({
+    color: "#080b0c",
+    roughness: 0.45,
+    metalness: 0.35,
+    emissive: new THREE.Color(PALETTE.mercedesTeal),
+    emissiveIntensity: 0.18,
   })
 
-  // Hitboxes spaced along the 60-unit length
-  for (let i = 0; i < 4; i += 1) {
-    const t = (i / 3) - 0.5
-    colliders.push({ x: standCenterX + t * (standWidth - 4), z: standBaseZ + 4, radius: 6 })
+  const rowStep = 1.34
+  const rowRise = 0.58
+  const depth = Math.max(2, (spec.rows - 1) * rowStep + 2)
+  const depthCenter = (depth * 0.5 - 0.5) * spec.depthSign
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(spec.width + 1.5, 0.32, depth + 1.2), riserMat)
+  base.position.set(0, 0.16, depthCenter)
+  base.castShadow = true
+  base.receiveShadow = true
+  stand.add(base)
+
+  for (let row = 0; row < spec.rows; row += 1) {
+    const y = 0.46 + row * rowRise
+    const z = row * rowStep * spec.depthSign
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(spec.width, 0.46, 1.08), row % 2 === 0 ? seatMat : riserMat)
+    bench.position.set(0, y, z)
+    bench.castShadow = true
+    bench.receiveShadow = true
+    stand.add(bench)
+
+    const stepFace = new THREE.Mesh(new THREE.BoxGeometry(spec.width, 0.36, 0.12), riserMat)
+    stepFace.position.set(0, y - 0.24, z - spec.depthSign * 0.58)
+    stepFace.castShadow = true
+    stand.add(stepFace)
+  }
+
+  if (spec.covered) {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(spec.width + 2.5, 0.34, depth + 2.4), roofMat)
+    roof.position.set(0, spec.rows * rowRise + 1.2, depthCenter)
+    roof.castShadow = true
+    stand.add(roof)
+    ;[-spec.width / 2 + 2, spec.width / 2 - 2].forEach((x) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, spec.rows * rowRise + 1.0, 0.32), roofMat)
+      post.position.set(x, (spec.rows * rowRise + 1.0) / 2, depthCenter)
+      post.castShadow = true
+      stand.add(post)
+    })
+  }
+
+  if (spec.screen) {
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(Math.max(5, spec.width * 0.22), 4.2, 0.32), screenMat)
+    screen.position.set(spec.width * 0.5 + 4.2, 3.2, depthCenter)
+    screen.castShadow = true
+    stand.add(screen)
+  }
+
+  stand.position.copy(spec.position)
+  stand.rotation.y = spec.yaw
+
+  const colliderCount = Math.max(1, Math.ceil(spec.width / 34))
+  const colliderRadius = Math.max(4.4, spec.rows * 0.72)
+  for (let i = 0; i < colliderCount; i += 1) {
+    const t = colliderCount === 1 ? 0 : i / (colliderCount - 1) - 0.5
+    addRotatedCollider(colliders, spec.position, spec.yaw, t * (spec.width - 6), depthCenter, colliderRadius)
+  }
+
+  return stand
+}
+
+function makeStand(
+  name: string,
+  x: number,
+  z: number,
+  heading: number,
+  offset: number,
+  width: number,
+  rows: number,
+  covered = false,
+  screen = false,
+): StandSpec {
+  return {
+    name,
+    position: tracksidePosition(x, z, heading, offset),
+    yaw: yawFromHeading(heading),
+    width,
+    rows,
+    depthSign: offset >= 0 ? 1 : -1,
+    covered,
+    screen,
   }
 }
 
-function buildPitBuilding(group: THREE.Group, colliders: Collider[]): void {
+function buildSuzukaGrandstands(group: THREE.Group, colliders: Collider[]): void {
+  const hMain = MAIN_STRAIGHT_HEADING
+  const hTurnOne = -1.0
+  const hEsses = -1.92
+  const hDunlop = 2.25
+  const hHairpin = -0.33
+  const hSpoon = 3.08
+  const h130r = 1.5
+  const hCasio = 2.71
+
+  const standSpecs: StandSpec[] = [
+    // Main straight, final corner, and pit-entry side.
+    makeStand("V1", 148, 16, hMain, 80, 58, 6, false, true),
+    makeStand("V2", 148, 16, hMain, 104, 68, 11, true, false),
+    makeStand("A1", 160, -34, hMain, 100, 34, 5, true, true),
+    makeStand("A2", 166, -42, hMain, 120, 38, 8, true, false),
+    makeStand("S", 150, 28, hMain, -100, 22, 4, false, true),
+    makeStand("R", 158, 38, hCasio, -100, 28, 5, false, true),
+    makeStand("Q1", 170, 58, hCasio, -100, 24, 4, false, false),
+    makeStand("Q2", 176, 60, hCasio, -120, 30, 8, false, true),
+
+    // First curve and S-curve entry.
+    makeStand("B1", 154, -74, hTurnOne, 90, 34, 5, false, true),
+    makeStand("B2-1", 148, -82, hTurnOne, 110, 24, 7, false, false),
+    makeStand("B2-2", 136, -86, hTurnOne, 112, 24, 7, false, false),
+    makeStand("B2-3", 124, -82, hTurnOne, 112, 24, 7, false, false),
+    makeStand("C", 106, -68, hTurnOne, 90, 48, 7, false, true),
+
+    // S Curves and Dunlop.
+    makeStand("D1", 78, -52, hEsses, 90, 24, 5, false, false),
+    makeStand("D2", 60, -58, hEsses, 92, 22, 5, false, false),
+    makeStand("D3", 42, -38, hEsses, 100, 22, 5, false, false),
+    makeStand("D4", 18, -46, hEsses, 96, 22, 4, false, true),
+    makeStand("D5", -8, -26, hEsses, 104, 22, 4, false, true),
+    makeStand("E1", -24, 48, hDunlop, 122, 28, 5, false, true),
+    makeStand("E2", 8, 64, hDunlop, 60, 30, 5, false, true),
+
+    // Hairpin, Spoon, and 130R.
+    makeStand("H", 102, 96, hHairpin, -120, 30, 5, false, true),
+    makeStand("I", 76, 132, hHairpin, -120, 58, 8, false, true),
+    makeStand("J", 28, 98, 2.7, -100, 22, 4, false, false),
+    makeStand("M", -166, 158, hSpoon, -112, 64, 6, false, true),
+    makeStand("G1", -20, 56, h130r, -96, 26, 4, false, true),
+    makeStand("G3", 20, 52, h130r, -60, 20, 4, false, false),
+    makeStand("G4", 62, 58, h130r, 60, 20, 4, false, false),
+    makeStand("G5", 104, 72, h130r, 92, 20, 4, false, false),
+    makeStand("P", 136, 82, h130r, -80, 42, 5, false, true),
+  ]
+
+  standSpecs.forEach((spec) => {
+    group.add(buildStandUnit(spec, colliders))
+  })
+}
+
+function buildPitComplex(group: THREE.Group, colliders: Collider[]): void {
   const pit = new THREE.Group()
-  const baseMat = new THREE.MeshStandardMaterial({ color: "#1a1d20", roughness: 0.55, metalness: 0.4 })
-  const glassMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.18, metalness: 0.4, transparent: true, opacity: 0.55, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.25 })
-  const accentMat = new THREE.MeshStandardMaterial({ color: PALETTE.silver, roughness: 0.3, metalness: 0.8 })
+  pit.name = "SuzukaPitPaddock"
 
-  const buildingLen = 64
-  const main = new THREE.Mesh(new THREE.BoxGeometry(buildingLen, 4.6, 6.5), baseMat)
-  main.position.y = 2.3
-  main.castShadow = true
-  main.receiveShadow = true
-  pit.add(main)
+  const pitLaneMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltRunoff, roughness: 0.92, metalness: 0.0 })
+  const pitWallMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.74, metalness: 0.08 })
+  const fenceMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.45, metalness: 0.6, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.15 })
+  const garageMat = new THREE.MeshStandardMaterial({ color: "#181d20", roughness: 0.58, metalness: 0.32 })
+  const doorMat = new THREE.MeshStandardMaterial({ color: "#2e3638", roughness: 0.4, metalness: 0.45 })
+  const glassMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.18, metalness: 0.4, transparent: true, opacity: 0.48, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.18 })
 
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(buildingLen - 2, 2.6, 5.2), baseMat)
-  deck.position.set(0, 5.9, 0)
-  pit.add(deck)
+  const laneLength = 156
+  const laneWidth = 9
+  const garageLength = 132
+  const garageDepth = 9
+  const garageZ = laneWidth * 0.5 + garageDepth * 0.5 + 6
 
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(buildingLen - 3, 1.8, 0.18), glassMat)
-  glass.position.set(0, 5.9, -2.6)
+  const lane = new THREE.Mesh(new THREE.BoxGeometry(laneLength, 0.045, laneWidth), pitLaneMat)
+  lane.position.y = 0.055
+  lane.receiveShadow = false
+  pit.add(lane)
+
+  const pitWallZ = -laneWidth * 0.5 - 2.1
+  for (let i = 0; i < 20; i += 1) {
+    const x = -laneLength / 2 + 4 + i * ((laneLength - 8) / 19)
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.55, 0.32), pitWallMat)
+    wall.position.set(x, 0.32, pitWallZ)
+    wall.castShadow = true
+    pit.add(wall)
+
+    const fence = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.8, 0.08), fenceMat)
+    fence.position.set(x, 1.35, pitWallZ)
+    fence.castShadow = true
+    pit.add(fence)
+  }
+
+  const garage = new THREE.Mesh(new THREE.BoxGeometry(garageLength, 4.8, garageDepth), garageMat)
+  garage.position.set(0, 2.4, garageZ)
+  garage.castShadow = true
+  garage.receiveShadow = true
+  pit.add(garage)
+
+  const upperDeck = new THREE.Mesh(new THREE.BoxGeometry(garageLength - 4, 2.2, garageDepth - 1.6), garageMat)
+  upperDeck.position.set(0, 6.0, garageZ)
+  upperDeck.castShadow = true
+  pit.add(upperDeck)
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(garageLength - 8, 1.25, 0.2), glassMat)
+  glass.position.set(0, 6.15, garageZ - garageDepth * 0.5 - 0.12)
   pit.add(glass)
 
-  for (let i = 0; i < 11; i += 1) {
-    const x = -((11 - 1) / 2) * 5.4 + i * 5.4
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.2, 0.22), accentMat)
-    panel.position.set(x, 1.7, -3.35)
-    pit.add(panel)
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 0.24), new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.4 }))
-    stripe.position.set(x, 0.42, -3.46)
+  const bayCount = 18
+  for (let i = 0; i < bayCount; i += 1) {
+    const x = -((bayCount - 1) / 2) * 6.7 + i * 6.7
+    const door = new THREE.Mesh(new THREE.BoxGeometry(5.5, 3.2, 0.22), doorMat)
+    door.position.set(x, 1.75, garageZ - garageDepth * 0.5 - 0.14)
+    door.castShadow = true
+    pit.add(door)
+
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.18, 0.26), fenceMat)
+    stripe.position.set(x, 0.42, garageZ - garageDepth * 0.5 - 0.28)
     pit.add(stripe)
   }
 
-  const pitPos = new THREE.Vector3(-54, 0, 50)
-  pit.position.copy(pitPos)
+  const raceControl = new THREE.Mesh(new THREE.BoxGeometry(18, 13, 12), garageMat)
+  raceControl.position.set(-garageLength * 0.5 + 12, 6.5, garageZ + 12)
+  raceControl.castShadow = true
+  raceControl.receiveShadow = true
+  pit.add(raceControl)
+
+  const controlGlass = new THREE.Mesh(new THREE.BoxGeometry(15, 4.2, 0.24), glassMat)
+  controlGlass.position.set(-garageLength * 0.5 + 12, 9.2, garageZ + 5.8)
+  pit.add(controlGlass)
+
+  ;[-34, 0, 34].forEach((x, i) => {
+    const block = new THREE.Mesh(new THREE.BoxGeometry(28, 4 + i * 0.7, 12), garageMat)
+    block.position.set(x, 2 + i * 0.35, garageZ + 24 + i * 2)
+    block.castShadow = true
+    block.receiveShadow = true
+    pit.add(block)
+  })
+
+  pit.position.copy(PIT_COMPLEX_POS)
+  pit.rotation.y = MAIN_STRAIGHT_YAW
   group.add(pit)
 
-  // Spread 6 cylindrical hitboxes along the 64-unit pit-building length so you bounce off it like a wall
-  for (let i = 0; i < 6; i += 1) {
-    const t = i / 5 - 0.5
-    colliders.push({ x: pitPos.x + t * (buildingLen - 6), z: pitPos.z, radius: 4.5 })
+  for (let i = 0; i < 7; i += 1) {
+    const t = i / 6 - 0.5
+    addRotatedCollider(colliders, PIT_COMPLEX_POS, MAIN_STRAIGHT_YAW, t * (garageLength - 8), garageZ, 5.4)
   }
+  addRotatedCollider(colliders, PIT_COMPLEX_POS, MAIN_STRAIGHT_YAW, -garageLength * 0.5 + 12, garageZ + 12, 7.5)
+  ;[-34, 0, 34].forEach((x) => {
+    addRotatedCollider(colliders, PIT_COMPLEX_POS, MAIN_STRAIGHT_YAW, x, garageZ + 25, 7.0)
+  })
 }
 
 function buildPetals(group: THREE.Group): PetalSystem {
@@ -473,12 +750,13 @@ function buildPetals(group: THREE.Group): PetalSystem {
 }
 
 function buildBannerColliders(colliders: Collider[]): void {
-  // Start/finish banner support poles. Curve at t=0.02 with SCALE_X=2.4 lands the
-  // banner near (-58 * 2.4, 0, 18 * 2.6) = (-139, 0, 47). Approximate poles ±7.5
-  // along the tangent; we add small radii so the car can squeeze past them but not
-  // drive through them.
+  const [x, , z] = SUZUKA_LANDMARKS.startFinish.position
+  const sideX = Math.cos(SUZUKA_LANDMARKS.startFinish.heading)
+  const sideZ = -Math.sin(SUZUKA_LANDMARKS.startFinish.heading)
+  // Start/finish banner support poles. Keep the hitboxes tiny so the car can
+  // squeeze past the gantry without clipping through the posts.
   ;[-7.5, 7.5].forEach((off) => {
-    colliders.push({ x: -139 + off, z: 47, radius: 0.7 })
+    colliders.push({ x: x + sideX * off, z: z + sideZ * off, radius: 0.7 })
   })
 }
 
@@ -496,8 +774,6 @@ export function buildEnvironment(scene: THREE.Scene): EnvironmentSystem {
   buildPaddyTerraces(group)
   buildTokyoSkyline(group)
   const ferrisWheel = buildFerrisWheel(group, colliders)
-  buildGrandstands(group, colliders)
-  buildPitBuilding(group, colliders)
   buildBannerColliders(colliders)
   const petals = buildPetals(group)
 
