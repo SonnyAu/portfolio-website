@@ -30,18 +30,18 @@ export type CircuitSection = {
 }
 
 export const CIRCUIT_SECTIONS: CircuitSection[] = [
-  { label: "PIT STRAIGHT", start: 0.985, end: 0.055 },
-  { label: "TURN 1 / TURN 2", start: 0.055, end: 0.16 },
-  { label: "S CURVES", start: 0.16, end: 0.29 },
-  { label: "DUNLOP", start: 0.29, end: 0.345 },
-  { label: "DEGNER", start: 0.345, end: 0.435 },
-  { label: "HAIRPIN", start: 0.435, end: 0.535 },
-  { label: "200R", start: 0.535, end: 0.625 },
-  { label: "SPOON", start: 0.625, end: 0.74 },
-  { label: "BACKSTRETCH / 130R", start: 0.74, end: 0.805 },
-  { label: "CROSSOVER BRIDGE", start: 0.805, end: 0.905, bridgeOnly: true, fallbackLabel: "130R" },
-  { label: "CASIO TRIANGLE", start: 0.905, end: 0.955 },
-  { label: "FINAL CORNER", start: 0.955, end: 0.985 },
+  { label: "PIT STRAIGHT", start: 0.973, end: 0.055 },
+  { label: "TURN 1 / TURN 2", start: 0.055, end: 0.145 },
+  { label: "S CURVES", start: 0.145, end: 0.23 },
+  { label: "DUNLOP", start: 0.23, end: 0.295 },
+  { label: "DEGNER", start: 0.295, end: 0.415 },
+  { label: "HAIRPIN", start: 0.415, end: 0.52 },
+  { label: "200R", start: 0.52, end: 0.6 },
+  { label: "SPOON", start: 0.6, end: 0.745 },
+  { label: "BACKSTRETCH / 130R", start: 0.745, end: 0.804 },
+  { label: "CROSSOVER BRIDGE", start: 0.804, end: 0.895, bridgeOnly: true, fallbackLabel: "130R" },
+  { label: "CASIO TRIANGLE", start: 0.895, end: 0.955 },
+  { label: "FINAL CORNER", start: 0.955, end: 0.973 },
 ]
 
 function normalizeTrackT(t: number): number {
@@ -74,7 +74,6 @@ const GROUND_DETAIL_Y_OFFSET = 0.03
 const GROUND_DETAIL_MAX_Y = 0.18
 const KERB_HALF = 6.0
 const WALL_OFF = 6.25
-const PILLAR_OFF = 6.0
 const TUNNEL_WALL_OFFSET = TRACK_HALF_WIDTH + 2.1
 const TUNNEL_WALL_THICKNESS = 0.7
 const TUNNEL_LENGTH = 38
@@ -90,127 +89,120 @@ export const SUZUKA_LANDMARKS: Record<
   startFinish: { position: toWorldPosition(126, 0, -24), heading: 0.43 },
   turnOneTwo: { position: toWorldPosition(180, 0, 154), heading: -1.26 },
   sCurves: { position: toWorldPosition(78, 0, 36), heading: -2.45 },
-  hairpin: { position: toWorldPosition(-26, 0, -84), heading: 1.14 },
+  hairpin: { position: toWorldPosition(-52, 0, -104), heading: 1.14 },
   spoon: { position: toWorldPosition(-240, 0, -96), heading: -0.23 },
   casioTriangle: { position: toWorldPosition(66, 0, -14), heading: 1.31 },
 }
 
 const TRACK_POINTS: Array<[number, number, number]> = [
-  // =========================================================
-  // Start / Finish and Turn 1-2
-  // =========================================================
-
-  // Start / finish, final corner exit onto pit straight
+  // helper waypoint before S/F
   [126, 0, -24],
+
+  // S/F and Turn 1-2
   [140, 0, 4],
   [156, 0, 42],
   [172, 0, 84],
 
-  // Turn 01, first corner entry
+  // Turn 01
   [184, 0, 116],
   [188, 0, 138],
   [180, 0, 154],
 
-  // Turn 02, first corner exit
+  // Turn 02
   [160, 0, 160],
   [140, 0, 148],
   [126, 0, 126],
 
-  // =========================================================
-  // Snake / Esses / Dunlop
-  // =========================================================
-
-  // Turns 03-04, Snake / Esses entry
+  // Snake / Esses
   [120, 0, 104],
   [104, 0, 86],
   [86, 0, 78],
 
-  // Turns 05-06, middle Snake
   [72, 0, 58],
   [78, 0, 36],
   [62, 0, 18],
 
-  // Turn 07, Dunlop / anti-banked curve
+  // Turn 07 Dunlop
   [38, 0, 18],
   [18, 0, 30],
   [4, 0, 48],
   [-18, 0, 44],
 
-  // =========================================================
-  // Degner / Hairpin / 200R  --- NO LOOP block
-  // =========================================================
-
-  // Turn 08, Degner 1
+  // Turn 08 Degner 1
   [-42, 0, 42],
+  [-52, 0, 42],
   [-60, 0, 40],
 
-  // Turn 09, Degner 2
-  [-66, 0, 26],
-  [-68, 0, 8],
-  [-64, 0, -12],
-  [-60, 0, -28],
+  // Turn 09 Degner 2
+  [-62, 0, 30],
+  [-61, 0, 18],
+  [-60, 0, 6],
+  [-59, 0, -8],
+  [-57, 0, -22],
+  [-54, 0, -34],
 
-  // Turn 10, hairpin entry (goes downward)
-  [-56, 0, -44],
-  [-50, 0, -60],
-  [-40, 0, -74],
+  // Turn 10 Hairpin entry
+  [-52, 0, -48],
+  [-50, 0, -62],
+  [-48, 0, -76],
 
-  // Turn 11, hairpin apex (top of the hook)
-  [-26, 0, -84],
-  [-12, 0, -78],
-  [-8, 0, -64],
+  // Turn 11 Hairpin apex
+  [-46, 0, -90],
+  [-46, 0, -100],
+  [-52, 0, -104],
+  [-62, 0, -98],
 
-  // Turn 12, 200R exit (must go leftward, not curl back)
-  [-18, 0, -50],
-  [-38, 0, -38],
-  [-66, 0, -30],
-  [-96, 0, -26],
-  [-126, 0, -24],
-  [-154, 0, -26],
-  [-180, 0, -38],
+  // Turn 12 200R
+  [-76, 0, -82],
+  [-92, 0, -64],
+  [-112, 0, -44],
+  [-134, 0, -26],
+  [-158, 0, -10],
 
-  // =========================================================
-  // Spoon
-  // =========================================================
-
-  // Turn 13, Spoon entry
-  [-202, 0, -60],
-  [-222, 0, -86],
+  // Turn 13 Spoon
+  [-184, 0, -18],
+  [-204, 0, -42],
+  [-220, 0, -68],
+  [-232, 0, -88],
   [-240, 0, -96],
 
-  // Turn 14, Spoon exit
-  [-246, 0, -72],
-  [-238, 0, -44],
-  [-220, 0, -20],
-  [-192, 0, -2],
-  [-156, 0, 8],
+  // Turn 14 Spoon
+  [-250, 0, -96],
+  [-258, 0, -90],
+  [-260, 0, -76],
+  [-256, 0, -58],
+  [-246, 0, -38],
+  [-228, 0, -18],
 
-  // =========================================================
-  // Backstretch / 130R / Casio
-  // =========================================================
+  // Backstretch into 130R
+  [-168, 0, 4],
+  [-142, 0, 8],
+  [-118, 0, 10],
+  [-94, 0, 12],
+  [-72, 0.8, 14],
+  [-56, 2.8, 15],
 
-  // Backstretch from Spoon toward 130R
-  [-118, 0, 8],
-  [-82, 0.8, 12],
+  // Turn 15 130R
   [-48, BRIDGE_Y, 16],
 
-  // Turn 15, 130R / crossover bridge
-  [-16, BRIDGE_Y, 12],
-  [14, BRIDGE_Y, 0],
-  [38, BRIDGE_Y, -18],
+  // Exit from 130R toward Casio Triangle
+  [-28, BRIDGE_Y, 14],
+  [-8, BRIDGE_Y, 8],
+  [12, 3.2, 0],
+  [30, 1.6, -16],
+  [46, 0.6, -28],
 
-  // Turn 16, Casio Triangle entry
-  [58, BRIDGE_Y, -34],
-  [72, 2.8, -28],
+  // Turn 16 Casio Triangle entry
+  [58, 0, -34],
+  [72, 0, -28],
   [66, 0, -14],
 
-  // Turn 17, Casio Triangle exit
+  // Turn 17 Casio Triangle exit
   [82, 0, -10],
   [102, 0, -18],
 
-  // Turn 18, final corner
+  // Turn 18 final corner
   [118, 0, -24],
-  [130, 0, -24],
 ]
 
 export const SUZUKA_TRACK_POINTS: Array<[number, number, number]> = TRACK_POINTS.map(([x, y, z]) => (
@@ -625,10 +617,8 @@ function buildCrossoverTunnel(curve: THREE.CatmullRomCurve3, group: THREE.Group)
 
 function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
   const samples = 240
-  const supportMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.85, metalness: 0.05 })
   const wallMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.7, metalness: 0.1 })
   const wallStripeMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.5, metalness: 0.3, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.25 })
-  const crossover = findCrossover(curve)
 
   const samplePoints: { p: THREE.Vector3; tan: THREE.Vector3 }[] = []
   for (let i = 0; i <= samples; i += 1) {
@@ -636,35 +626,8 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
     samplePoints.push({ p: curve.getPoint(t), tan: curve.getTangent(t).normalize() })
   }
 
-  // Pillars every ~8 samples on bridge segments (denser than before)
-  for (let i = 0; i < samples; i += 1) {
-    const sp = samplePoints[i]
-    if (sp.p.y < 0.6) continue
-    if (i % 7 !== 0) continue
-    if (crossover && Math.hypot(sp.p.x - crossover.upper.p.x, sp.p.z - crossover.upper.p.z) < 22) continue
-
-    const sx = sp.tan.z
-    const sz = -sp.tan.x
-    ;[-PILLAR_OFF, PILLAR_OFF].forEach((off) => {
-      const pillarHeight = sp.p.y + 0.5
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.6, pillarHeight, 0.6), supportMat)
-      pillar.position.set(sp.p.x + sx * off, pillarHeight / 2 - 0.5, sp.p.z + sz * off)
-      pillar.castShadow = true
-      pillar.receiveShadow = true
-      group.add(pillar)
-
-      // Cross brace
-      if (off > 0) {
-        const brace = new THREE.Mesh(new THREE.BoxGeometry(PILLAR_OFF * 2 + 0.5, 0.2, 0.2), supportMat)
-        brace.position.set(sp.p.x, sp.p.y * 0.5, sp.p.z)
-        brace.rotation.y = Math.atan2(sp.tan.x, sp.tan.z) + Math.PI / 2
-        group.add(brace)
-      }
-    })
-  }
-
-  // Solid wall panels along the deck edges (replaces thin railings).
-  // Build as a series of short box segments stitched along the bridge.
+  // Solid wall panels along elevated road edges. The terrain mesh now supplies
+  // the visible support, so repeated bridge pillars would fight the embankment.
   const wallHeight = 0.95
   const wallThickness = 0.18
   const segLen = 1.5

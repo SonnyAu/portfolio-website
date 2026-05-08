@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { PALETTE } from "./palette"
-import { SCALE_X, SCALE_Z, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS } from "./track"
+import { SCALE_X, SCALE_Z, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS, TRACK_HALF_WIDTH } from "./track"
 
 export type Collider = { x: number; z: number; radius: number }
 
@@ -17,27 +17,79 @@ export type PetalSystem = {
   update: (delta: number) => void
 }
 
-const TRACK_CLEARANCE_SAMPLES = (() => {
+type TrackTerrainSample = {
+  point: THREE.Vector3
+  t: number
+}
+
+const ELEVATED_TERRAIN_START_Y = 0.35
+const EMBANKMENT_INNER_RADIUS = TRACK_HALF_WIDTH + 7.5
+const EMBANKMENT_OUTER_RADIUS = 46
+const EMBANKMENT_TOP_CLEARANCE = 0.58
+const EMBANKMENT_MAX_HEIGHT = 4.55
+const UNDERPASS_CLEAR_INNER = TRACK_HALF_WIDTH + 9
+const UNDERPASS_CLEAR_OUTER = TRACK_HALF_WIDTH + 22
+
+const TRACK_TERRAIN_SAMPLES = (() => {
   const curve = new THREE.CatmullRomCurve3(
     SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     true,
     "centripetal",
     0.5,
   )
-  const samples: THREE.Vector3[] = []
-  for (let i = 0; i < 420; i += 1) {
-    samples.push(curve.getPoint(i / 420))
+  const samples: TrackTerrainSample[] = []
+  for (let i = 0; i < 520; i += 1) {
+    const t = i / 520
+    samples.push({
+      point: curve.getPoint(t),
+      t,
+    })
   }
   return samples
 })()
 
-function distanceToTrackXZ(x: number, z: number): number {
+const TRACK_CLEARANCE_SAMPLES = TRACK_TERRAIN_SAMPLES.map(({ point }) => point)
+const ELEVATED_TERRAIN_SAMPLES = TRACK_TERRAIN_SAMPLES.filter(({ point }) => point.y > ELEVATED_TERRAIN_START_Y)
+const UNDERPASS_CLEARANCE_POINTS = TRACK_TERRAIN_SAMPLES
+  .filter(({ point, t }) => (
+    point.y <= 0.2 &&
+    ELEVATED_TERRAIN_SAMPLES.some(({ point: elevated, t: elevatedT }) => (
+      Math.min(Math.abs(t - elevatedT), 1 - Math.abs(t - elevatedT)) > 0.18 &&
+      Math.hypot(point.x - elevated.x, point.z - elevated.z) < 90
+    ))
+  ))
+  .map(({ point }) => point)
+
+function distanceToPointsXZ(points: THREE.Vector3[], x: number, z: number): number {
   let best = Number.POSITIVE_INFINITY
-  for (const p of TRACK_CLEARANCE_SAMPLES) {
+  for (const p of points) {
     const distance = Math.hypot(p.x - x, p.z - z)
     if (distance < best) best = distance
   }
   return best
+}
+
+function distanceToTrackXZ(x: number, z: number): number {
+  return distanceToPointsXZ(TRACK_CLEARANCE_SAMPLES, x, z)
+}
+
+function raisedTrackTerrainHeight(x: number, z: number): number {
+  let height = 0
+
+  for (const { point } of ELEVATED_TERRAIN_SAMPLES) {
+    const distance = Math.hypot(point.x - x, point.z - z)
+    if (distance >= EMBANKMENT_OUTER_RADIUS) continue
+
+    const falloff = 1 - THREE.MathUtils.smoothstep(distance, EMBANKMENT_INNER_RADIUS, EMBANKMENT_OUTER_RADIUS)
+    const targetHeight = Math.min(EMBANKMENT_MAX_HEIGHT, Math.max(0, point.y - EMBANKMENT_TOP_CLEARANCE))
+    height = Math.max(height, targetHeight * falloff)
+  }
+
+  if (height <= 0 || UNDERPASS_CLEARANCE_POINTS.length === 0) return height
+
+  const underpassDistance = distanceToPointsXZ(UNDERPASS_CLEARANCE_POINTS, x, z)
+  const underpassOpening = THREE.MathUtils.smoothstep(underpassDistance, UNDERPASS_CLEAR_INNER, UNDERPASS_CLEAR_OUTER)
+  return height * underpassOpening
 }
 
 const MAIN_STRAIGHT_YAW = 1.2
@@ -95,7 +147,7 @@ function addRotatedCollider(
 }
 
 function buildGround(group: THREE.Group): void {
-  const geo = new THREE.PlaneGeometry(1400, 1400, 110, 110)
+  const geo = new THREE.PlaneGeometry(1400, 1400, 150, 150)
   geo.rotateX(-Math.PI / 2)
 
   const positions = geo.attributes.position as THREE.BufferAttribute
@@ -113,7 +165,9 @@ function buildGround(group: THREE.Group): void {
       Math.sin(x * 0.012 + z * 0.016) * 1.4 +
       Math.cos(x * 0.028 - z * 0.02) * 0.8 +
       Math.sin(x * 0.005 + z * 0.0075) * 4.4
-    const y = flatZone * trackClearance * sceneryClearance * Math.max(noise, 0)
+    const rollingTerrainY = flatZone * trackClearance * sceneryClearance * Math.max(noise, 0)
+    const embankmentY = raisedTrackTerrainHeight(x, z) * sceneryClearance
+    const y = Math.max(rollingTerrainY, embankmentY)
     positions.setY(i, y - 0.05)
 
     const tint = THREE.MathUtils.clamp(y / 5, 0, 1)
