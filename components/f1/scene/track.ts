@@ -69,6 +69,7 @@ export function getCircuitSectionAt(t: number, y: number): string {
 export const SCALE_X = 2.4
 export const SCALE_Z = 2.6
 export const TRACK_HALF_WIDTH = 6.0
+export const PAVED_HALF_WIDTH = TRACK_HALF_WIDTH + 4.8
 export const START_FINISH_GANTRY_POLE_OFFSET = TRACK_HALF_WIDTH + 2.6
 const TRACK_WIDTH = 12.0
 const TRACK_SURFACE_Y_OFFSET = 0.04
@@ -1040,7 +1041,7 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
         const dx = xs[i] - x
         const dz = zs[i] - z
         const planarD = Math.sqrt(dx * dx + dz * dz)
-        if (planarD > nearestD + TRACK_HALF_WIDTH) continue
+        if (planarD > nearestD + PAVED_HALF_WIDTH) continue
 
         const t = i / samples
         const routePenalty = hasPreviousT ? progressDistance(t, previousRouteT) * 8 : 0
@@ -1065,13 +1066,23 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
       }
 
       const nearestIsBridge = ys[nearestI] > 0.2
-      const lowerIsUsable = groundI >= 0 && groundD <= TRACK_HALF_WIDTH + 1.0
-      const bridgeIsUsable = bridgeI >= 0 && bridgeD <= TRACK_HALF_WIDTH + 1.0
+      const lowerIsUsable = groundI >= 0 && groundD <= PAVED_HALF_WIDTH + 0.5
+      const bridgeIsUsable = bridgeI >= 0 && bridgeD <= PAVED_HALF_WIDTH + 0.5
       const nearLowerLayer = currentY < 1.05
       const committedToBridge = currentY > BRIDGE_THRESHOLD || previousY > BRIDGE_THRESHOLD
       const continuingBridgeRamp = previousY > 0.2 && currentY > 0.55
+      const bridgeT = bridgeI >= 0 ? bridgeI / samples : 0
+      const bridgeY = bridgeI >= 0 ? ys[bridgeI] : 0
+      const bridgeContinuesRoute = !hasPreviousT || progressDistance(bridgeT, previousRouteT) < 0.12
+      const enteringBridgeRamp =
+        bridgeIsUsable &&
+        bridgeY <= BRIDGE_THRESHOLD &&
+        bridgeContinuesRoute &&
+        (!lowerIsUsable || bridgeD + 0.9 < groundD)
 
-      if (currentY < 0.7 && lowerIsUsable) {
+      if (enteringBridgeRamp) {
+        bestI = bridgeI
+      } else if (currentY < 0.7 && lowerIsUsable) {
         bestI = groundI
       } else if (bridgeIsUsable && (committedToBridge || continuingBridgeRamp)) {
         bestI = bridgeI
@@ -1163,5 +1174,5 @@ export function buildSuzukaTrack(): TrackSystem {
 
   const sampler = buildTrackSampler(curve)
 
-  return { group, curve, startFinish, sampler, trackHalfWidth: TRACK_HALF_WIDTH }
+  return { group, curve, startFinish, sampler, trackHalfWidth: PAVED_HALF_WIDTH }
 }
