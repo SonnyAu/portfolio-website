@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { PALETTE } from "./palette"
-import { SCALE_X, SCALE_Z, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS, TRACK_HALF_WIDTH } from "./track"
+import { SCALE_X, SCALE_Z, START_FINISH_GANTRY_POLE_OFFSET, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS, TRACK_HALF_WIDTH } from "./track"
 
 export type Collider = { x: number; z: number; radius: number }
 
@@ -834,10 +834,10 @@ function buildBannerColliders(colliders: Collider[]): void {
   const [x, , z] = SUZUKA_LANDMARKS.startFinish.position
   const sideX = Math.cos(SUZUKA_LANDMARKS.startFinish.heading)
   const sideZ = -Math.sin(SUZUKA_LANDMARKS.startFinish.heading)
-  // Start/finish banner support poles. Keep the hitboxes tiny so the car can
-  // squeeze past the gantry without clipping through the posts.
-  ;[-7.5, 7.5].forEach((off) => {
-    colliders.push({ x: x + sideX * off, z: z + sideZ * off, radius: 0.7 })
+  // Start/finish banner support poles. Keep them outside the drivable surface
+  // so they don't block either half of the checker line.
+  ;[-START_FINISH_GANTRY_POLE_OFFSET, START_FINISH_GANTRY_POLE_OFFSET].forEach((off) => {
+    colliders.push({ x: x + sideX * off, z: z + sideZ * off, radius: 0.35 })
   })
 }
 

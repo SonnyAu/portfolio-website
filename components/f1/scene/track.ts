@@ -69,6 +69,7 @@ export function getCircuitSectionAt(t: number, y: number): string {
 export const SCALE_X = 2.4
 export const SCALE_Z = 2.6
 export const TRACK_HALF_WIDTH = 6.0
+export const START_FINISH_GANTRY_POLE_OFFSET = TRACK_HALF_WIDTH + 2.6
 const TRACK_WIDTH = 12.0
 const TRACK_SURFACE_Y_OFFSET = 0.04
 const PAINT_Y_OFFSET = 0.075
@@ -968,15 +969,16 @@ function buildStartFinish(curve: THREE.CatmullRomCurve3, group: THREE.Group): TH
     ctx.fillText("MERCEDES-AMG PETRONAS - SUZUKA", 512, 64)
   }
   const bannerTex = new THREE.CanvasTexture(bannerCanvas)
+  const bannerWidth = START_FINISH_GANTRY_POLE_OFFSET * 2 + 0.8
   const banner = new THREE.Mesh(
-    new THREE.BoxGeometry(14, 1.2, 0.2),
+    new THREE.BoxGeometry(bannerWidth, 1.2, 0.2),
     new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.6 }),
   )
   banner.position.set(point.x, 7, point.z)
   banner.rotation.y = Math.atan2(tangent.x, tangent.z)
   group.add(banner)
 
-  ;[-7.5, 7.5].forEach((off) => {
+  ;[-START_FINISH_GANTRY_POLE_OFFSET, START_FINISH_GANTRY_POLE_OFFSET].forEach((off) => {
     const pole = new THREE.Mesh(
       new THREE.BoxGeometry(0.4, 7, 0.4),
       new THREE.MeshStandardMaterial({ color: "#2a2e30", roughness: 0.5, metalness: 0.5 }),
