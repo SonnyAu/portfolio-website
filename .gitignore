@@ -1,3 +1,9 @@
 node_modules
 .next
 tsconfig.tsbuildinfo
+
+# Large 3D assets (procedural W15 is built in code, GLB/GLTFs are dev-only)
+*.glb
+*.gltf
+!public/**/*.glb
+!public/**/*.gltf
