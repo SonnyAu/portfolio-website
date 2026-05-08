@@ -17,79 +17,95 @@ export type PetalSystem = {
   update: (delta: number) => void
 }
 
-type TrackTerrainSample = {
-  point: THREE.Vector3
-  t: number
-}
-
-const ELEVATED_TERRAIN_START_Y = 0.35
-const EMBANKMENT_INNER_RADIUS = TRACK_HALF_WIDTH + 7.5
-const EMBANKMENT_OUTER_RADIUS = 46
-const EMBANKMENT_TOP_CLEARANCE = 0.58
-const EMBANKMENT_MAX_HEIGHT = 4.55
-const UNDERPASS_CLEAR_INNER = TRACK_HALF_WIDTH + 9
-const UNDERPASS_CLEAR_OUTER = TRACK_HALF_WIDTH + 22
-
-const TRACK_TERRAIN_SAMPLES = (() => {
+const TRACK_CLEARANCE_SAMPLES = (() => {
   const curve = new THREE.CatmullRomCurve3(
     SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     true,
     "centripetal",
     0.5,
   )
-  const samples: TrackTerrainSample[] = []
-  for (let i = 0; i < 520; i += 1) {
-    const t = i / 520
-    samples.push({
-      point: curve.getPoint(t),
-      t,
-    })
+  const samples: THREE.Vector3[] = []
+  const sampleCount = 720
+  for (let i = 0; i < sampleCount; i += 1) {
+    samples.push(curve.getPoint(i / sampleCount))
   }
   return samples
 })()
 
-const TRACK_CLEARANCE_SAMPLES = TRACK_TERRAIN_SAMPLES.map(({ point }) => point)
-const ELEVATED_TERRAIN_SAMPLES = TRACK_TERRAIN_SAMPLES.filter(({ point }) => point.y > ELEVATED_TERRAIN_START_Y)
-const UNDERPASS_CLEARANCE_POINTS = TRACK_TERRAIN_SAMPLES
-  .filter(({ point, t }) => (
-    point.y <= 0.2 &&
-    ELEVATED_TERRAIN_SAMPLES.some(({ point: elevated, t: elevatedT }) => (
-      Math.min(Math.abs(t - elevatedT), 1 - Math.abs(t - elevatedT)) > 0.18 &&
-      Math.hypot(point.x - elevated.x, point.z - elevated.z) < 90
-    ))
-  ))
-  .map(({ point }) => point)
+type LowerRoadCutSample = {
+  x: number
+  y: number
+  z: number
+}
 
-function distanceToPointsXZ(points: THREE.Vector3[], x: number, z: number): number {
+const LOWER_CUT_NEGATIVE_Y = -0.05
+const LOWER_CUT_TRANSITION_Y = 0.08
+const LOWER_CUT_SAMPLE_COUNT = 720
+const LOWER_CUT_EXTENSION_SAMPLES = 18
+const LOWER_CUT_INNER_HALF_WIDTH = TRACK_HALF_WIDTH + 1.6
+const LOWER_CUT_OUTER_HALF_WIDTH = TRACK_HALF_WIDTH + 10.0
+const LOWER_CUT_CLEARANCE_BELOW_ROAD = 1.0
+const TRACK_TERRAIN_SINK_INNER = TRACK_HALF_WIDTH + 9.5
+const TRACK_TERRAIN_SINK_OUTER = TRACK_HALF_WIDTH + 24.0
+const TRACK_TERRAIN_SINK_DEPTH = 1.0
+
+const LOWER_ROAD_CUT_SAMPLES = (() => {
+  const curve = new THREE.CatmullRomCurve3(
+    SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    true,
+    "centripetal",
+    0.5,
+  )
+  const samples: THREE.Vector3[] = []
+  const negativeIndices: number[] = []
+
+  for (let i = 0; i < LOWER_CUT_SAMPLE_COUNT; i += 1) {
+    const point = curve.getPoint(i / LOWER_CUT_SAMPLE_COUNT)
+    samples.push(point)
+    if (point.y < LOWER_CUT_NEGATIVE_Y) negativeIndices.push(i)
+  }
+
+  if (negativeIndices.length === 0) return [] as LowerRoadCutSample[]
+
+  const first = Math.max(0, Math.min(...negativeIndices) - LOWER_CUT_EXTENSION_SAMPLES)
+  const last = Math.min(LOWER_CUT_SAMPLE_COUNT - 1, Math.max(...negativeIndices) + LOWER_CUT_EXTENSION_SAMPLES)
+  const cutSamples: LowerRoadCutSample[] = []
+  for (let i = first; i <= last; i += 1) {
+    const point = samples[i]
+    if (point.y <= LOWER_CUT_TRANSITION_Y) {
+      cutSamples.push({ x: point.x, y: point.y, z: point.z })
+    }
+  }
+
+  return cutSamples
+})()
+
+function distanceToTrackXZ(x: number, z: number): number {
   let best = Number.POSITIVE_INFINITY
-  for (const p of points) {
+  for (const p of TRACK_CLEARANCE_SAMPLES) {
     const distance = Math.hypot(p.x - x, p.z - z)
     if (distance < best) best = distance
   }
   return best
 }
 
-function distanceToTrackXZ(x: number, z: number): number {
-  return distanceToPointsXZ(TRACK_CLEARANCE_SAMPLES, x, z)
-}
+function underpassCuttingGroundY(x: number, z: number): number {
+  if (LOWER_ROAD_CUT_SAMPLES.length === 0) return 0
 
-function raisedTrackTerrainHeight(x: number, z: number): number {
-  let height = 0
-
-  for (const { point } of ELEVATED_TERRAIN_SAMPLES) {
-    const distance = Math.hypot(point.x - x, point.z - z)
-    if (distance >= EMBANKMENT_OUTER_RADIUS) continue
-
-    const falloff = 1 - THREE.MathUtils.smoothstep(distance, EMBANKMENT_INNER_RADIUS, EMBANKMENT_OUTER_RADIUS)
-    const targetHeight = Math.min(EMBANKMENT_MAX_HEIGHT, Math.max(0, point.y - EMBANKMENT_TOP_CLEARANCE))
-    height = Math.max(height, targetHeight * falloff)
+  let nearest: LowerRoadCutSample | null = null
+  let nearestDistance = Number.POSITIVE_INFINITY
+  for (const sample of LOWER_ROAD_CUT_SAMPLES) {
+    const distance = Math.hypot(sample.x - x, sample.z - z)
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearest = sample
+    }
   }
 
-  if (height <= 0 || UNDERPASS_CLEARANCE_POINTS.length === 0) return height
+  if (!nearest || nearestDistance >= LOWER_CUT_OUTER_HALF_WIDTH) return 0
 
-  const underpassDistance = distanceToPointsXZ(UNDERPASS_CLEARANCE_POINTS, x, z)
-  const underpassOpening = THREE.MathUtils.smoothstep(underpassDistance, UNDERPASS_CLEAR_INNER, UNDERPASS_CLEAR_OUTER)
-  return height * underpassOpening
+  const cutFactor = 1 - THREE.MathUtils.smoothstep(nearestDistance, LOWER_CUT_INNER_HALF_WIDTH, LOWER_CUT_OUTER_HALF_WIDTH)
+  return (nearest.y - LOWER_CUT_CLEARANCE_BELOW_ROAD) * cutFactor
 }
 
 const MAIN_STRAIGHT_YAW = 1.2
@@ -147,7 +163,7 @@ function addRotatedCollider(
 }
 
 function buildGround(group: THREE.Group): void {
-  const geo = new THREE.PlaneGeometry(1400, 1400, 150, 150)
+  const geo = new THREE.PlaneGeometry(1400, 1400, 220, 220)
   geo.rotateX(-Math.PI / 2)
 
   const positions = geo.attributes.position as THREE.BufferAttribute
@@ -158,26 +174,37 @@ function buildGround(group: THREE.Group): void {
     const x = positions.getX(i)
     const z = positions.getZ(i)
     const distFromCenter = Math.hypot(x, z)
+    const trackDistance = distanceToTrackXZ(x, z)
     const flatZone = THREE.MathUtils.smoothstep(distFromCenter, 160, 320)
-    const trackClearance = THREE.MathUtils.smoothstep(distanceToTrackXZ(x, z), 44, 96)
+    const trackClearance = THREE.MathUtils.smoothstep(trackDistance, 48, 104)
     const sceneryClearance = sceneryClearingFactor(x, z)
     const noise =
       Math.sin(x * 0.012 + z * 0.016) * 1.4 +
       Math.cos(x * 0.028 - z * 0.02) * 0.8 +
       Math.sin(x * 0.005 + z * 0.0075) * 4.4
     const rollingTerrainY = flatZone * trackClearance * sceneryClearance * Math.max(noise, 0)
-    const embankmentY = raisedTrackTerrainHeight(x, z) * sceneryClearance
-    const y = Math.max(rollingTerrainY, embankmentY)
+    const cuttingY = underpassCuttingGroundY(x, z)
+    const trackBedSink =
+      (1 - THREE.MathUtils.smoothstep(trackDistance, TRACK_TERRAIN_SINK_INNER, TRACK_TERRAIN_SINK_OUTER)) *
+      TRACK_TERRAIN_SINK_DEPTH
+    const y = cuttingY < 0 ? Math.min(cuttingY, rollingTerrainY - trackBedSink) : rollingTerrainY - trackBedSink
     positions.setY(i, y - 0.05)
 
-    const tint = THREE.MathUtils.clamp(y / 5, 0, 1)
+    const tint = THREE.MathUtils.clamp(Math.max(0, y) / 5, 0, 1)
     const c = grass.clone().lerp(grassHill, tint)
     colors.push(c.r, c.g, c.b)
   }
   geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
   geo.computeVertexNormals()
 
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0, metalness: 0.0, flatShading: false })
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.92,
+    metalness: 0.0,
+    flatShading: false,
+    emissive: new THREE.Color("#17360f"),
+    emissiveIntensity: 0.28,
+  })
   const ground = new THREE.Mesh(geo, mat)
   ground.receiveShadow = false
   group.add(ground)

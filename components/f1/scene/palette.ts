@@ -5,11 +5,11 @@ export const PALETTE = {
   carbonGrey: "#15191c",
   silver: "#cfd6d4",
   rubberBlack: "#0a0a0a",
-  asphalt: "#171a1d",
-  asphaltDark: "#060708",
+  asphalt: "#020304",
+  asphaltDark: "#030405",
   concreteDeck: "#5a5e62",
   concreteDark: "#3e4144",
-  asphaltRunoff: "#202428",
+  asphaltRunoff: "#2b3033",
   kerbWhite: "#f4f4f4",
   kerbRed: "#e51622",
   gravel: "#c9a878",
@@ -40,8 +40,8 @@ export const PALETTE = {
   sunGlow: "#ffb060",
   fogWarm: "#ffb98a",
   // Ground
-  grass: "#2c3a24",
-  grassHill: "#3a4a2c",
+  grass: "#3f6a2f",
+  grassHill: "#5f7f3f",
 } as const
 
 export const SUNLIGHT_COLOR = "#ffe4c0"

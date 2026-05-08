@@ -25,6 +25,7 @@ type CarState = {
   heading: number
   velocity: number
   steering: number
+  trackT: number
 }
 
 const START_GRID = SUZUKA_LANDMARKS.startFinish
@@ -111,6 +112,7 @@ export default function F1TrackPortfolio() {
     heading: START_GRID.heading,
     velocity: 0,
     steering: 0,
+    trackT: 0,
   })
   const activeStationRef = useRef<Station | null>(activeStation)
   const stationsRef = useRef<Station[]>([])
@@ -156,6 +158,7 @@ export default function F1TrackPortfolio() {
     carState.current.y = station.position[1]
     carState.current.velocity = 0
     carState.current.steering = 0
+    carState.current.trackT = 0
     revealStation(station)
   }, [revealStation])
 
@@ -269,7 +272,8 @@ export default function F1TrackPortfolio() {
       state.z = THREE.MathUtils.clamp(state.z, DRIVE_BOUNDS.minZ, DRIVE_BOUNDS.maxZ)
 
       // Track-following Y elevation: drive up the ramp onto the bridge, drop back to ground when off it.
-      const ground = sampler.getGroundAt(state.x, state.z, state.y)
+      const ground = sampler.getGroundAt(state.x, state.z, state.y, state.trackT)
+      state.trackT = ground.t
       const onTrack = ground.distance < trackHalfWidth + 0.5
       const targetY = onTrack ? ground.y : 0
       const climbingRamp = targetY > state.y + 0.08

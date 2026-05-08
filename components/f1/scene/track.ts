@@ -10,13 +10,15 @@ export type TrackSystem = {
 }
 
 export type TrackSampler = {
-  getGroundAt: (x: number, z: number, currentY: number) => { y: number; distance: number; t: number }
+  getGroundAt: (x: number, z: number, currentY: number, previousT?: number) => { y: number; distance: number; t: number; layer: TrackLayer }
 }
 
 export type TrackLandmark = {
   position: [number, number, number]
   heading: number
 }
+
+export type TrackLayer = "ground" | "elevated"
 
 const BRIDGE_Y = 5.2
 export const BRIDGE_THRESHOLD = 1.2
@@ -74,13 +76,24 @@ const GROUND_DETAIL_Y_OFFSET = 0.03
 const GROUND_DETAIL_MAX_Y = 0.18
 const KERB_HALF = 6.0
 const WALL_OFF = 6.25
-const TUNNEL_WALL_OFFSET = TRACK_HALF_WIDTH + 2.1
-const TUNNEL_WALL_THICKNESS = 0.7
-const TUNNEL_LENGTH = 38
-const TUNNEL_WALL_HEIGHT = 4.35
-const TUNNEL_SOFFIT_Y = BRIDGE_Y - 0.65
+const UNDERPASS_VOID_HALF_WIDTH = TRACK_HALF_WIDTH + 1.15
+const UNDERPASS_VOID_HALF_LENGTH = 92
+const UNDERPASS_WALL_THICKNESS = 0.65
+const UNDERPASS_WALL_TOP_Y = 0.22
+const UNDERPASS_BANK_WIDTH = 5.0
+const BRIDGE_DETAIL_MIN_Y = BRIDGE_Y - 0.45
+const BRIDGE_SIDE_PANEL_OFF = TRACK_HALF_WIDTH + 0.45
+const BRIDGE_SPONSOR_PANEL_HEIGHT = 0.72
+const BRIDGE_SUPPORT_OFF = TRACK_HALF_WIDTH + 3.4
+const APPROACH_EMBANKMENT_MIN_Y = 0.35
+const APPROACH_EMBANKMENT_INNER_OFFSET = TRACK_HALF_WIDTH + 0.9
+const APPROACH_EMBANKMENT_OUTER_OFFSET = TRACK_HALF_WIDTH + 6.2
+const APPROACH_EMBANKMENT_TOP_DROP = 0.75
+const APPROACH_EMBANKMENT_MAX_Y = 1.6
+const LOWER_CUT_SURFACE_CLIP_Y = -0.05
 
 const toWorldPosition = (x: number, y: number, z: number): [number, number, number] => [x * SCALE_X, y, z * SCALE_Z]
+const toWorldVector = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(...toWorldPosition(x, y, z))
 
 export const SUZUKA_LANDMARKS: Record<
   "startFinish" | "turnOneTwo" | "sCurves" | "hairpin" | "spoon" | "casioTriangle",
@@ -130,16 +143,16 @@ const TRACK_POINTS: Array<[number, number, number]> = [
 
   // Turn 08 Degner 1
   [-42, 0, 42],
-  [-52, 0, 42],
-  [-60, 0, 40],
+  [-52, -0.25, 42],
+  [-60, -0.65, 40],
 
   // Turn 09 Degner 2
-  [-62, 0, 30],
-  [-61, 0, 18],
-  [-60, 0, 6],
-  [-59, 0, -8],
-  [-57, 0, -22],
-  [-54, 0, -34],
+  [-62, -1.05, 30],
+  [-61, -1.35, 18],
+  [-60, -1.55, 6],
+  [-59, -1.45, -8],
+  [-57, -0.85, -22],
+  [-54, -0.35, -34],
 
   // Turn 10 Hairpin entry
   [-52, 0, -48],
@@ -175,12 +188,12 @@ const TRACK_POINTS: Array<[number, number, number]> = [
   [-228, 0, -18],
 
   // Backstretch into 130R
-  [-168, 0, 4],
-  [-142, 0, 8],
-  [-118, 0, 10],
-  [-94, 0, 12],
-  [-72, 0.8, 14],
-  [-56, 2.8, 15],
+  [-168, 0.6, 4],
+  [-142, 1.4, 8],
+  [-118, 2.6, 10],
+  [-94, 4.0, 12],
+  [-72, BRIDGE_Y, 14],
+  [-56, BRIDGE_Y, 15],
 
   // Turn 15 130R
   [-48, BRIDGE_Y, 16],
@@ -188,12 +201,12 @@ const TRACK_POINTS: Array<[number, number, number]> = [
   // Exit from 130R toward Casio Triangle
   [-28, BRIDGE_Y, 14],
   [-8, BRIDGE_Y, 8],
-  [12, 3.2, 0],
-  [30, 1.6, -16],
-  [46, 0.6, -28],
+  [12, 4.6, 0],
+  [30, 3.2, -16],
+  [46, 1.6, -28],
 
   // Turn 16 Casio Triangle entry
-  [58, 0, -34],
+  [58, 0.4, -34],
   [72, 0, -28],
   [66, 0, -14],
 
@@ -313,6 +326,7 @@ function buildSurfaceBand(
   samples: number,
   yOffset: number,
   material: THREE.Material,
+  clipUnderpass?: UnderpassVoid | null,
 ): THREE.Mesh {
   const positions: number[] = []
   const normals: number[] = []
@@ -327,18 +341,33 @@ function buildSurfaceBand(
     const sideX = tangent.z
     const sideZ = -tangent.x
 
-    if (point.y > GROUND_DETAIL_MAX_Y) {
+    const innerX = point.x + sideX * innerOffset
+    const innerZ = point.z + sideZ * innerOffset
+    const outerX = point.x + sideX * outerOffset
+    const outerZ = point.z + sideZ * outerOffset
+    const isDepressedLowerRoad = point.y < LOWER_CUT_SURFACE_CLIP_Y
+    const clippedByUnderpass = clipUnderpass
+      ? point.y <= GROUND_DETAIL_MAX_Y &&
+      (
+        isDepressedLowerRoad ||
+        isInsideUnderpassVoid(clipUnderpass, point.x, point.z, 1.8) ||
+        isInsideUnderpassVoid(clipUnderpass, innerX, innerZ, 0.35) ||
+        isInsideUnderpassVoid(clipUnderpass, outerX, outerZ, 0.35)
+      )
+      : false
+
+    if (point.y > GROUND_DETAIL_MAX_Y || clippedByUnderpass) {
       sampleVerts.push({ inner: -1, outer: -1, valid: false })
       continue
     }
 
     const innerIdx = positions.length / 3
-    positions.push(point.x + sideX * innerOffset, point.y + yOffset, point.z + sideZ * innerOffset)
+    positions.push(innerX, point.y + yOffset, innerZ)
     normals.push(0, 1, 0)
     uvs.push(0, t * 24)
 
     const outerIdx = positions.length / 3
-    positions.push(point.x + sideX * outerOffset, point.y + yOffset, point.z + sideZ * outerOffset)
+    positions.push(outerX, point.y + yOffset, outerZ)
     normals.push(0, 1, 0)
     uvs.push(1, t * 24)
 
@@ -372,9 +401,10 @@ function addMirroredSurfaceBands(
   samples: number,
   yOffset: number,
   material: THREE.Material,
+  clipUnderpass?: UnderpassVoid | null,
 ): void {
-  group.add(buildSurfaceBand(curve, innerOffset, outerOffset, samples, yOffset, material))
-  group.add(buildSurfaceBand(curve, -innerOffset, -outerOffset, samples, yOffset, material))
+  group.add(buildSurfaceBand(curve, innerOffset, outerOffset, samples, yOffset, material, clipUnderpass))
+  group.add(buildSurfaceBand(curve, -innerOffset, -outerOffset, samples, yOffset, material, clipUnderpass))
 }
 
 function buildKerbs(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
@@ -475,147 +505,386 @@ function buildPaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): v
   }
 }
 
-type CrossoverSample = {
-  p: THREE.Vector3
-  tan: THREE.Vector3
-  t: number
+type UnderpassVoid = {
+  center: THREE.Vector3
+  yaw: number
+  halfWidth: number
+  halfLength: number
 }
 
-type CrossoverInfo = {
-  lower: CrossoverSample
-  upper: CrossoverSample
-  planarDistance: number
+function buildDegnerUnderpassVoid(): UnderpassVoid {
+  const center = toWorldVector(-60, -1.55, 6)
+  const entry = toWorldVector(-62, -1.05, 30)
+  const exit = toWorldVector(-54, -0.35, -34)
+  const tangent = exit.sub(entry).normalize()
+
+  return {
+    center,
+    yaw: Math.atan2(tangent.x, tangent.z),
+    halfWidth: UNDERPASS_VOID_HALF_WIDTH,
+    halfLength: UNDERPASS_VOID_HALF_LENGTH,
+  }
 }
 
-function findCrossover(curve: THREE.CatmullRomCurve3): CrossoverInfo | null {
-  const samples = 360
-  const lower: CrossoverSample[] = []
-  const upper: CrossoverSample[] = []
+function toUnderpassLocal(space: UnderpassVoid, x: number, z: number): { x: number; z: number } {
+  const dx = x - space.center.x
+  const dz = z - space.center.z
+  const c = Math.cos(-space.yaw)
+  const s = Math.sin(-space.yaw)
+  return {
+    x: dx * c + dz * s,
+    z: -dx * s + dz * c,
+  }
+}
+
+function isInsideUnderpassVoid(space: UnderpassVoid, x: number, z: number, padding = 0): boolean {
+  const local = toUnderpassLocal(space, x, z)
+  return Math.abs(local.x) <= space.halfWidth + padding && Math.abs(local.z) <= space.halfLength + padding
+}
+
+function buildApproachEmbankment(
+  curve: THREE.CatmullRomCurve3,
+  underpass: UnderpassVoid,
+  side: -1 | 1,
+  material: THREE.Material,
+): THREE.Mesh {
+  const samples = 260
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const sampleVerts: Array<{ inner: number; outer: number; valid: boolean }> = []
 
   for (let i = 0; i <= samples; i += 1) {
     const t = i / samples
     const p = curve.getPoint(t)
-    const sample = { p, tan: curve.getTangent(t).normalize(), t }
-    if (p.y <= 0.2) lower.push(sample)
-    if (p.y >= BRIDGE_Y - 0.35) upper.push(sample)
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z * side
+    const sz = -tan.x * side
+    const innerX = p.x + sx * APPROACH_EMBANKMENT_INNER_OFFSET
+    const innerZ = p.z + sz * APPROACH_EMBANKMENT_INNER_OFFSET
+    const outerX = p.x + sx * APPROACH_EMBANKMENT_OUTER_OFFSET
+    const outerZ = p.z + sz * APPROACH_EMBANKMENT_OUTER_OFFSET
+    const crossesVoid =
+      isInsideUnderpassVoid(underpass, p.x, p.z, 1.8) ||
+      isInsideUnderpassVoid(underpass, innerX, innerZ, 0.6) ||
+      isInsideUnderpassVoid(underpass, outerX, outerZ, 0.6)
+    const valid = p.y > APPROACH_EMBANKMENT_MIN_Y && p.y < BRIDGE_Y - 0.6 && !crossesVoid
+
+    if (!valid) {
+      sampleVerts.push({ inner: -1, outer: -1, valid: false })
+      continue
+    }
+
+    const innerY = Math.min(APPROACH_EMBANKMENT_MAX_Y, Math.max(0.08, p.y - APPROACH_EMBANKMENT_TOP_DROP))
+    const outerY = 0.02
+
+    const innerIdx = positions.length / 3
+    positions.push(innerX, innerY, innerZ)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 10)
+
+    const outerIdx = positions.length / 3
+    positions.push(outerX, outerY, outerZ)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 10)
+
+    sampleVerts.push({ inner: innerIdx, outer: outerIdx, valid: true })
   }
 
-  let best: CrossoverInfo | null = null
-  lower.forEach((low) => {
-    upper.forEach((high) => {
-      const planarDistance = Math.hypot(low.p.x - high.p.x, low.p.z - high.p.z)
-      if (!best || planarDistance < best.planarDistance) {
-        best = { lower: low, upper: high, planarDistance }
-      }
-    })
-  })
+  for (let i = 0; i < samples; i += 1) {
+    const a = sampleVerts[i]
+    const b = sampleVerts[i + 1]
+    if (!a.valid || !b.valid) continue
+    indices.push(a.inner, b.inner, a.outer, a.outer, b.inner, b.outer)
+  }
 
-  return best
-}
-
-function createBermGeometry(innerX: number, outerX: number, halfLength: number, highY: number, lowY: number): THREE.BufferGeometry {
-  const positions = [
-    innerX, 0, -halfLength,
-    outerX, 0, -halfLength,
-    outerX, 0, halfLength,
-    innerX, 0, halfLength,
-    innerX, highY, -halfLength,
-    outerX, lowY, -halfLength,
-    outerX, lowY, halfLength,
-    innerX, highY, halfLength,
-  ]
-  const indices = [
-    0, 2, 1, 0, 3, 2,
-    4, 5, 6, 4, 6, 7,
-    0, 1, 5, 0, 5, 4,
-    3, 7, 6, 3, 6, 2,
-    0, 4, 7, 0, 7, 3,
-    1, 2, 6, 1, 6, 5,
-  ]
   const geo = new THREE.BufferGeometry()
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
   geo.setIndex(indices)
   geo.computeVertexNormals()
   geo.computeBoundingSphere()
-  return geo
+
+  const mesh = new THREE.Mesh(geo, material)
+  mesh.receiveShadow = false
+  return mesh
 }
 
-function buildCrossoverTunnel(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
-  const crossover = findCrossover(curve)
-  if (!crossover) return
+function buildUnderpassSurfaceStrip(
+  curve: THREE.CatmullRomCurve3,
+  side: -1 | 1,
+  innerOffset: number,
+  outerOffset: number,
+  samples: number,
+  material: THREE.Material,
+  getInnerY: (p: THREE.Vector3) => number,
+  getOuterY: (p: THREE.Vector3) => number,
+): THREE.Mesh {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const sampleVerts: Array<{ inner: number; outer: number; valid: boolean }> = []
 
-  const tunnel = new THREE.Group()
-  tunnel.name = "CrossoverTunnel"
-  tunnel.position.set(crossover.lower.p.x, 0, crossover.lower.p.z)
-  tunnel.rotation.y = Math.atan2(crossover.lower.tan.x, crossover.lower.tan.z)
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const p = curve.getPoint(t)
+    if (p.y >= LOWER_CUT_SURFACE_CLIP_Y) {
+      sampleVerts.push({ inner: -1, outer: -1, valid: false })
+      continue
+    }
 
-  const concreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.86, metalness: 0.04 })
-  const darkConcreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.94, metalness: 0.02 })
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z * side
+    const sz = -tan.x * side
+    const innerIdx = positions.length / 3
+    positions.push(p.x + sx * innerOffset, getInnerY(p), p.z + sz * innerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 18)
+
+    const outerIdx = positions.length / 3
+    positions.push(p.x + sx * outerOffset, getOuterY(p), p.z + sz * outerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 18)
+
+    sampleVerts.push({ inner: innerIdx, outer: outerIdx, valid: true })
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = sampleVerts[i]
+    const b = sampleVerts[i + 1]
+    if (!a.valid || !b.valid) continue
+    indices.push(a.inner, b.inner, a.outer, a.outer, b.inner, b.outer)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  geo.computeBoundingSphere()
+
+  const mesh = new THREE.Mesh(geo, material)
+  mesh.receiveShadow = false
+  return mesh
+}
+
+function buildUnderpassWallMesh(
+  curve: THREE.CatmullRomCurve3,
+  side: -1 | 1,
+  material: THREE.Material,
+): THREE.Mesh {
+  const samples = 360
+  const wallInnerOffset = TRACK_HALF_WIDTH + 0.95
+  const wallOuterOffset = wallInnerOffset + UNDERPASS_WALL_THICKNESS
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const sampleVerts: Array<{
+    innerTop: number
+    innerBottom: number
+    outerTop: number
+    outerBottom: number
+    valid: boolean
+  }> = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const p = curve.getPoint(t)
+    if (p.y >= LOWER_CUT_SURFACE_CLIP_Y) {
+      sampleVerts.push({ innerTop: -1, innerBottom: -1, outerTop: -1, outerBottom: -1, valid: false })
+      continue
+    }
+
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z * side
+    const sz = -tan.x * side
+    const topY = UNDERPASS_WALL_TOP_Y
+    const bottomY = p.y - 0.12
+
+    const innerTop = positions.length / 3
+    positions.push(p.x + sx * wallInnerOffset, topY, p.z + sz * wallInnerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 18)
+
+    const innerBottom = positions.length / 3
+    positions.push(p.x + sx * wallInnerOffset, bottomY, p.z + sz * wallInnerOffset)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 18)
+
+    const outerTop = positions.length / 3
+    positions.push(p.x + sx * wallOuterOffset, topY, p.z + sz * wallOuterOffset)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 18)
+
+    const outerBottom = positions.length / 3
+    positions.push(p.x + sx * wallOuterOffset, bottomY, p.z + sz * wallOuterOffset)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 18)
+
+    sampleVerts.push({ innerTop, innerBottom, outerTop, outerBottom, valid: true })
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = sampleVerts[i]
+    const b = sampleVerts[i + 1]
+    if (!a.valid || !b.valid) continue
+
+    indices.push(a.innerBottom, b.innerBottom, a.innerTop, a.innerTop, b.innerBottom, b.innerTop)
+    indices.push(a.outerTop, b.outerBottom, a.outerBottom, a.outerTop, b.outerTop, b.outerBottom)
+    indices.push(a.innerTop, b.innerTop, a.outerTop, a.outerTop, b.innerTop, b.outerTop)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  geo.computeBoundingSphere()
+
+  const mesh = new THREE.Mesh(geo, material)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  return mesh
+}
+
+function buildUnderpassRetainingWalls(
+  group: THREE.Group,
+  curve: THREE.CatmullRomCurve3,
+  concreteMat: THREE.Material,
+  darkConcreteMat: THREE.Material,
+  earthMat: THREE.Material,
+): void {
+  const channel = new THREE.Group()
+  channel.name = "DegnerRetainingWalls"
+  ;([-1, 1] as const).forEach((side) => {
+    channel.add(buildUnderpassWallMesh(curve, side, concreteMat))
+    channel.add(buildUnderpassSurfaceStrip(
+      curve,
+      side,
+      TRACK_HALF_WIDTH + 0.12,
+      TRACK_HALF_WIDTH + 0.72,
+      360,
+      darkConcreteMat,
+      (p) => p.y + 0.025,
+      (p) => p.y + 0.025,
+    ))
+    channel.add(buildUnderpassSurfaceStrip(
+      curve,
+      side,
+      TRACK_HALF_WIDTH + 0.95 + UNDERPASS_WALL_THICKNESS,
+      TRACK_HALF_WIDTH + 0.95 + UNDERPASS_WALL_THICKNESS + UNDERPASS_BANK_WIDTH,
+      360,
+      earthMat,
+      () => UNDERPASS_WALL_TOP_Y + 0.06,
+      () => 0.02,
+    ))
+  })
+
+  group.add(channel)
+}
+
+function buildUpperBridgeDetails(
+  curve: THREE.CatmullRomCurve3,
+  group: THREE.Group,
+  underpass: UnderpassVoid,
+  sponsorMat: THREE.Material,
+  sponsorAccentMat: THREE.Material,
+  supportMat: THREE.Material,
+): void {
+  const samples = 300
+  const panelLength = 1.7
+  const ribMat = supportMat
+
+  for (let i = 0; i < samples; i += 1) {
+    const t = i / samples
+    const p = curve.getPoint(t)
+    const next = curve.getPoint((i + 1) / samples)
+    if (p.y < BRIDGE_DETAIL_MIN_Y || next.y < BRIDGE_DETAIL_MIN_Y) continue
+
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z
+    const sz = -tan.x
+    const yaw = Math.atan2(tan.x, tan.z)
+
+    if (i % 2 === 0) {
+      ;[-1, 1].forEach((side) => {
+        const panel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.18, BRIDGE_SPONSOR_PANEL_HEIGHT, panelLength),
+          sponsorMat,
+        )
+        panel.position.set(
+          p.x + sx * side * BRIDGE_SIDE_PANEL_OFF,
+          p.y - BRIDGE_SPONSOR_PANEL_HEIGHT * 0.5 - 0.18,
+          p.z + sz * side * BRIDGE_SIDE_PANEL_OFF,
+        )
+        panel.rotation.y = yaw
+        panel.castShadow = true
+        group.add(panel)
+
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, panelLength * 0.54), sponsorAccentMat)
+        stripe.position.set(panel.position.x, panel.position.y + 0.02, panel.position.z)
+        stripe.rotation.y = yaw
+        group.add(stripe)
+      })
+    }
+
+    if (i % 18 === 0) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(TRACK_WIDTH + 3.0, 0.14, 0.28), ribMat)
+      rib.position.set(p.x, p.y - 0.58, p.z)
+      rib.rotation.y = yaw
+      rib.castShadow = true
+      group.add(rib)
+
+      ;[-1, 1].forEach((side) => {
+        const supportX = p.x + sx * side * BRIDGE_SUPPORT_OFF
+        const supportZ = p.z + sz * side * BRIDGE_SUPPORT_OFF
+        if (isInsideUnderpassVoid(underpass, supportX, supportZ, 1.4)) return
+
+        const supportHeight = Math.max(0.8, p.y - 0.62)
+        const column = new THREE.Mesh(new THREE.BoxGeometry(0.75, supportHeight, 0.75), supportMat)
+        column.position.set(supportX, supportHeight * 0.5, supportZ)
+        column.castShadow = true
+        column.receiveShadow = true
+        group.add(column)
+      })
+    }
+  }
+}
+
+function buildApproachEmbankments(curve: THREE.CatmullRomCurve3, group: THREE.Group, underpass: UnderpassVoid): void {
+  const earthMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.grassHill,
+    roughness: 1.0,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+  })
+
+  group.add(buildApproachEmbankment(curve, underpass, -1, earthMat))
+  group.add(buildApproachEmbankment(curve, underpass, 1, earthMat))
+}
+
+function buildCrossoverOverpass(curve: THREE.CatmullRomCurve3, group: THREE.Group, underpass: UnderpassVoid | null): void {
+  if (!underpass) return
+
+  const concreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.86, metalness: 0.04, side: THREE.DoubleSide })
+  const darkConcreteMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.94, metalness: 0.02, side: THREE.DoubleSide })
+  const sponsorMat = new THREE.MeshStandardMaterial({ color: PALETTE.trackYellow, roughness: 0.58, metalness: 0.02 })
+  const sponsorAccentMat = new THREE.MeshStandardMaterial({ color: PALETTE.kerbRed, roughness: 0.5, metalness: 0.02 })
   const earthMat = new THREE.MeshStandardMaterial({ color: PALETTE.grassHill, roughness: 1.0, metalness: 0, flatShading: true, side: THREE.DoubleSide })
 
-  const halfLength = TUNNEL_LENGTH * 0.5
-  const wallY = TUNNEL_WALL_HEIGHT * 0.5 + 0.04
-  ;[-1, 1].forEach((side) => {
-    const wall = new THREE.Mesh(
-      new THREE.BoxGeometry(TUNNEL_WALL_THICKNESS, TUNNEL_WALL_HEIGHT, TUNNEL_LENGTH),
-      concreteMat,
-    )
-    wall.position.set(side * TUNNEL_WALL_OFFSET, wallY, 0)
-    wall.castShadow = true
-    wall.receiveShadow = true
-    tunnel.add(wall)
-
-    const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(TUNNEL_WALL_THICKNESS + 0.04, 0.08, TUNNEL_LENGTH * 0.92),
-      darkConcreteMat,
-    )
-    stripe.position.set(side * TUNNEL_WALL_OFFSET, 1.45, 0)
-    tunnel.add(stripe)
-
-    const innerX = side * (TUNNEL_WALL_OFFSET + TUNNEL_WALL_THICKNESS * 0.5)
-    const outerX = side * (TUNNEL_WALL_OFFSET + TUNNEL_WALL_THICKNESS * 0.5 + 7.0)
-    const berm = new THREE.Mesh(createBermGeometry(innerX, outerX, halfLength + 3, TUNNEL_WALL_HEIGHT * 0.74, 0.28), earthMat)
-    berm.position.y = 0.01
-    berm.receiveShadow = false
-    tunnel.add(berm)
-  })
-
-  const soffitWidth = TUNNEL_WALL_OFFSET * 2 + TUNNEL_WALL_THICKNESS + 1.2
-  const soffit = new THREE.Mesh(
-    new THREE.BoxGeometry(soffitWidth, 0.5, TUNNEL_LENGTH + 5),
-    darkConcreteMat,
-  )
-  soffit.position.set(0, TUNNEL_SOFFIT_Y, 0)
-  soffit.castShadow = true
-  soffit.receiveShadow = true
-  tunnel.add(soffit)
-
-  ;[-1, 1].forEach((end) => {
-    const z = end * (halfLength + 0.45)
-    const lintel = new THREE.Mesh(
-      new THREE.BoxGeometry(soffitWidth + 2.0, 0.82, 0.8),
-      concreteMat,
-    )
-    lintel.position.set(0, TUNNEL_SOFFIT_Y - 0.08, z)
-    lintel.castShadow = true
-    tunnel.add(lintel)
-
-    ;[-1, 1].forEach((side) => {
-      const cheek = new THREE.Mesh(
-        new THREE.BoxGeometry(1.7, TUNNEL_WALL_HEIGHT + 0.45, 0.9),
-        concreteMat,
-      )
-      cheek.position.set(side * TUNNEL_WALL_OFFSET, (TUNNEL_WALL_HEIGHT + 0.45) * 0.5, z)
-      cheek.castShadow = true
-      cheek.receiveShadow = true
-      tunnel.add(cheek)
-    })
-  })
-
-  group.add(tunnel)
+  buildUnderpassRetainingWalls(group, curve, concreteMat, darkConcreteMat, earthMat)
+  buildApproachEmbankments(curve, group, underpass)
+  buildUpperBridgeDetails(curve, group, underpass, sponsorMat, sponsorAccentMat, darkConcreteMat)
 }
 
-function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
+function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group, underpass: UnderpassVoid | null): void {
   const samples = 240
   const wallMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.7, metalness: 0.1 })
   const wallStripeMat = new THREE.MeshStandardMaterial({ color: PALETTE.mercedesTeal, roughness: 0.5, metalness: 0.3, emissive: new THREE.Color(PALETTE.mercedesTeal), emissiveIntensity: 0.25 })
@@ -626,8 +895,8 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
     samplePoints.push({ p: curve.getPoint(t), tan: curve.getTangent(t).normalize() })
   }
 
-  // Solid wall panels along elevated road edges. The terrain mesh now supplies
-  // the visible support, so repeated bridge pillars would fight the embankment.
+  // Solid wall panels along elevated road edges. Ramp-height panels are clipped
+  // out of the protected lower-road void so the underpass mouths stay open.
   const wallHeight = 0.95
   const wallThickness = 0.18
   const segLen = 1.5
@@ -642,15 +911,19 @@ function buildBridgeSupports(curve: THREE.CatmullRomCurve3, group: THREE.Group):
     const yaw = Math.atan2(sp.tan.x, sp.tan.z)
 
     ;[-WALL_OFF, WALL_OFF].forEach((off) => {
+      const wallX = sp.p.x + sx * off
+      const wallZ = sp.p.z + sz * off
+      if (underpass && sp.p.y < BRIDGE_DETAIL_MIN_Y && isInsideUnderpassVoid(underpass, wallX, wallZ, 0.9)) return
+
       const wall = new THREE.Mesh(new THREE.BoxGeometry(wallThickness, wallHeight, segLen), wallMat)
-      wall.position.set(sp.p.x + sx * off, sp.p.y + wallHeight / 2 + 0.08, sp.p.z + sz * off)
+      wall.position.set(wallX, sp.p.y + wallHeight / 2 + 0.08, wallZ)
       wall.rotation.y = yaw
       wall.castShadow = true
       wall.receiveShadow = true
       group.add(wall)
 
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(wallThickness * 1.05, 0.08, segLen), wallStripeMat)
-      stripe.position.set(sp.p.x + sx * off, sp.p.y + wallHeight + 0.08, sp.p.z + sz * off)
+      stripe.position.set(wallX, sp.p.y + wallHeight + 0.08, wallZ)
       stripe.rotation.y = yaw
       group.add(stripe)
     })
@@ -728,8 +1001,14 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
     ys[i] = p.y
     zs[i] = p.z
   }
+
+  const progressDistance = (a: number, b: number): number => {
+    const delta = Math.abs(normalizeTrackT(a) - normalizeTrackT(b))
+    return Math.min(delta, 1 - delta)
+  }
+
   return {
-    getGroundAt(x: number, z: number, currentY: number) {
+    getGroundAt(x: number, z: number, currentY: number, previousT?: number) {
       let nearestI = 0
       let nearestD = Number.POSITIVE_INFINITY
       for (let i = 0; i < samples; i += 1) {
@@ -746,39 +1025,64 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
       let bestScore = Number.POSITIVE_INFINITY
       let groundI = -1
       let groundD = Number.POSITIVE_INFINITY
+      let groundScore = Number.POSITIVE_INFINITY
       let bridgeI = -1
       let bridgeD = Number.POSITIVE_INFINITY
+      let bridgeScore = Number.POSITIVE_INFINITY
+      const hasPreviousT = typeof previousT === "number" && Number.isFinite(previousT)
+      const previousRouteT = hasPreviousT ? Number(previousT) : 0
+      const previousSampleI = hasPreviousT ? Math.round(normalizeTrackT(previousRouteT) * samples) % samples : -1
+      const previousY = previousSampleI >= 0 ? ys[previousSampleI] : 0
+
       for (let i = 0; i < samples; i += 1) {
         const dx = xs[i] - x
         const dz = zs[i] - z
         const planarD = Math.sqrt(dx * dx + dz * dz)
         if (planarD > nearestD + TRACK_HALF_WIDTH) continue
 
-        if (ys[i] <= BRIDGE_THRESHOLD && planarD < groundD) {
+        const t = i / samples
+        const routePenalty = hasPreviousT ? progressDistance(t, previousRouteT) * 8 : 0
+        const layerScore = planarD + routePenalty
+        if (ys[i] <= 0.2 && layerScore < groundScore) {
           groundD = planarD
+          groundScore = layerScore
           groundI = i
         }
-        if (ys[i] > BRIDGE_THRESHOLD && planarD < bridgeD) {
+        if (ys[i] > 0.2 && layerScore < bridgeScore) {
           bridgeD = planarD
+          bridgeScore = layerScore
           bridgeI = i
         }
 
         const yDelta = Math.abs(ys[i] - currentY)
-        const score = yDelta * 12 + planarD * 0.02
+        const score = yDelta * 12 + planarD * 0.02 + routePenalty
         if (score < bestScore) {
           bestScore = score
           bestI = i
         }
       }
 
-      const nearestIsBridge = ys[nearestI] > BRIDGE_THRESHOLD
+      const nearestIsBridge = ys[nearestI] > 0.2
       const lowerIsUsable = groundI >= 0 && groundD <= TRACK_HALF_WIDTH + 1.0
       const bridgeIsUsable = bridgeI >= 0 && bridgeD <= TRACK_HALF_WIDTH + 1.0
-      if (currentY < 0.35 && lowerIsUsable) {
+      const nearLowerLayer = currentY < 1.05
+      const committedToBridge = currentY > BRIDGE_THRESHOLD || previousY > BRIDGE_THRESHOLD
+      const continuingBridgeRamp = previousY > 0.2 && currentY > 0.55
+
+      if (currentY < 0.7 && lowerIsUsable) {
         bestI = groundI
-      } else if (currentY < 1.4 && lowerIsUsable) {
+      } else if (bridgeIsUsable && (committedToBridge || continuingBridgeRamp)) {
+        bestI = bridgeI
+      } else if (nearLowerLayer && lowerIsUsable) {
         bestI = groundI
-      } else if (bridgeIsUsable && (nearestIsBridge || currentY > 0.65 || !lowerIsUsable || bridgeD + 1.0 < groundD)) {
+      } else if (
+        bridgeIsUsable
+        && (
+          !lowerIsUsable
+          || (nearestIsBridge && currentY > 0.9)
+          || (currentY > 0.9 && bridgeD + 1.0 < groundD)
+        )
+      ) {
         bestI = bridgeI
       } else if (lowerIsUsable) {
         bestI = groundI
@@ -786,7 +1090,12 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
 
       const dx = xs[bestI] - x
       const dz = zs[bestI] - z
-      return { y: ys[bestI], distance: Math.sqrt(dx * dx + dz * dz), t: bestI / samples }
+      return {
+        y: ys[bestI],
+        distance: Math.sqrt(dx * dx + dz * dz),
+        t: bestI / samples,
+        layer: ys[bestI] > 0.2 ? "elevated" : "ground",
+      }
     },
   }
 }
@@ -801,6 +1110,7 @@ export function buildSuzukaTrack(): TrackSystem {
     "centripetal",
     0.5,
   )
+  const underpass = buildDegnerUnderpassVoid()
 
   // Materials
   const concreteSideMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.85, metalness: 0.05 })
@@ -810,19 +1120,26 @@ export function buildSuzukaTrack(): TrackSystem {
   const gravelMat = new THREE.MeshStandardMaterial({ color: PALETTE.gravel, roughness: 0.98, metalness: 0.0, side: groundBandSide })
   const runOffMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltRunoff, roughness: 0.94, metalness: 0.0, side: groundBandSide })
   const shoulderMat = new THREE.MeshStandardMaterial({ color: PALETTE.asphaltDark, roughness: 0.95, metalness: 0.0, side: groundBandSide })
+  ;[gravelMat, runOffMat, shoulderMat].forEach((mat) => {
+    mat.fog = false
+  })
 
-  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 0.35, TRACK_HALF_WIDTH + 1.7, 600, GROUND_DETAIL_Y_OFFSET + 0.012, shoulderMat)
-  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 1.95, TRACK_HALF_WIDTH + 4.8, 600, GROUND_DETAIL_Y_OFFSET + 0.006, runOffMat)
-  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 5.1, TRACK_HALF_WIDTH + 6.7, 600, GROUND_DETAIL_Y_OFFSET, gravelMat)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 0.35, TRACK_HALF_WIDTH + 1.7, 600, GROUND_DETAIL_Y_OFFSET + 0.012, shoulderMat, underpass)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 1.95, TRACK_HALF_WIDTH + 4.8, 600, GROUND_DETAIL_Y_OFFSET + 0.006, runOffMat, underpass)
+  addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 5.1, TRACK_HALF_WIDTH + 6.7, 600, GROUND_DETAIL_Y_OFFSET, gravelMat, underpass)
 
   // Main asphalt deck (thick so the bridge has a visible solid underside)
   const trackTopMat = new THREE.MeshStandardMaterial({
     color: PALETTE.asphalt,
     roughness: 0.85,
     metalness: 0.0,
-    emissive: new THREE.Color("#0b0c0d"),
-    emissiveIntensity: 0.36,
+    emissive: new THREE.Color("#000000"),
+    emissiveIntensity: 0.0,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   })
+  trackTopMat.fog = false
   const trackMesh = buildThickRibbon({
     curve,
     width: TRACK_WIDTH,
@@ -836,8 +1153,8 @@ export function buildSuzukaTrack(): TrackSystem {
 
   buildPaintedLines(curve, group)
   buildKerbs(curve, group)
-  buildBridgeSupports(curve, group)
-  buildCrossoverTunnel(curve, group)
+  buildBridgeSupports(curve, group, underpass)
+  buildCrossoverOverpass(curve, group, underpass)
   const startFinish = buildStartFinish(curve, group)
 
   void concreteUnderMat
