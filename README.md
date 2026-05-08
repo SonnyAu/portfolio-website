@@ -1,30 +1,72 @@
-# Modern portfolio website
+<h1 align="center">Portfolio</h1>
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+<p align="center">
+  <strong>Drive the circuit.</strong><br/>
+  A stylized Suzuka-inspired portfolio — procedural F1 scene, checkpoint stations, golden-hour ambience.
+</p>
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/sonny-aus-projects/v0-modern-portfolio-website)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/aO8Vkin4rcR)
+<br/>
 
-## Overview
+---
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+<br/>
 
-## Deployment
+### What’s inside
 
-Your project is live at:
+- **Home** loads a boot sequence (`AdvancedLoadingSystem`), then mounts the **interactive circuit** (`F1TrackPortfolio`) client-side so WebGL starts cleanly.
+- **Three.js** scene: procedural **W15-style** car, thick ribbon track with crossover bridge, Japanese landscape props, GSAP-fed HUD and centred station modals.
+- **Driving loop**: chase camera, track-height sampling, off-track slowdown, cylindrical colliders — no external car GLB committed by default.
 
-**[https://vercel.com/sonny-aus-projects/v0-modern-portfolio-website](https://vercel.com/sonny-aus-projects/v0-modern-portfolio-website)**
+<br/>
 
-## Build your app
+### Stack
 
-Continue building your app on:
+| Layer | Notes |
+|:---:|:---|
+| **App** | [Next.js&nbsp;15](https://nextjs.org/) · App Router · [React&nbsp;19](https://react.dev/) · [TypeScript](https://www.typescriptlang.org/) |
+| **UI** | [Tailwind CSS](https://tailwindcss.com/) · [Radix](https://www.radix-ui.com/) primitives · [Lucide](https://lucide.dev/) · [`tailwind-merge`](https://github.com/dcastil/tailwind-merge) · [`class-variance-authority`](https://cva.style/docs) |
+| **3D** | [Three.js](https://threejs.org/) (@types included) · modular `components/f1/scene/` (track, car, sky, env, stations) |
+| **Motion** | [GSAP](https://greensock.com/gsap/) — preloader choreography, overlays |
+| **Forms & data** (where used) | [React Hook Form](https://react-hook-form.com/) · [Zod](https://zod.dev/) · [Recharts](https://recharts.org/) · [`cmdk`](https://cmdk.paco.me/) |
+| **Theming** | [`next-themes`](https://github.com/pacocoursey/next-themes) |
 
-**[https://v0.dev/chat/projects/aO8Vkin4rcR](https://v0.dev/chat/projects/aO8Vkin4rcR)**
+The hero experience is **`dynamic(..., { ssr: false })`** from [`app/page.tsx`](app/page.tsx) so the Three bundle stays client-only.
 
-## How It Works
+<br/>
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+### Layout
+
+```
+app/                    ← App Router entry, preloader → circuit
+components/
+├── f1-track-portfolio.tsx
+├── advanced-loading-system.tsx
+├── f1/scene/           ← buildScene, track, car, environment, stations, sky, palette
+├── ui/
+└── …
+```
+
+<br/>
+
+### Run it
+
+Requires **Node 20+**. Install with **pnpm** (lockfile: `pnpm-lock.yaml`).
+
+```bash
+pnpm install
+pnpm dev       # http://localhost:3000
+pnpm build && pnpm start
+pnpm lint
+```
+
+<br/>
+
+### Large assets
+
+`.glb` / `.gltf` patterns are ignored in Git (see [`.gitignore`](.gitignore)); the showcased car is **generated in code**. Drop models under **`public/`** if you add them later.
+
+<br/>
+
+<p align="center">
+  <sub>Portfolio content is personal. Third‑party libraries follow their own licenses.</sub>
+</p>
