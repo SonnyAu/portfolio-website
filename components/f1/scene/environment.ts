@@ -32,6 +32,26 @@ const TRACK_CLEARANCE_SAMPLES = (() => {
   return samples
 })()
 
+const TRACK_SCENERY_BOUNDS = (() => {
+  const bounds = TRACK_CLEARANCE_SAMPLES.reduce(
+    (acc, point) => ({
+      minX: Math.min(acc.minX, point.x),
+      maxX: Math.max(acc.maxX, point.x),
+      minZ: Math.min(acc.minZ, point.z),
+      maxZ: Math.max(acc.maxZ, point.z),
+    }),
+    { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, minZ: Number.POSITIVE_INFINITY, maxZ: Number.NEGATIVE_INFINITY },
+  )
+  const centerX = (bounds.minX + bounds.maxX) * 0.5
+  const centerZ = (bounds.minZ + bounds.maxZ) * 0.5
+  const radius = TRACK_CLEARANCE_SAMPLES.reduce(
+    (maxRadius, point) => Math.max(maxRadius, Math.hypot(point.x - centerX, point.z - centerZ)),
+    0,
+  )
+
+  return { ...bounds, centerX, centerZ, radius }
+})()
+
 type LowerRoadCutSample = {
   x: number
   y: number
@@ -48,6 +68,10 @@ const LOWER_CUT_CLEARANCE_BELOW_ROAD = 1.0
 const TRACK_TERRAIN_SINK_INNER = TRACK_HALF_WIDTH + 9.5
 const TRACK_TERRAIN_SINK_OUTER = TRACK_HALF_WIDTH + 24.0
 const TRACK_TERRAIN_SINK_DEPTH = 1.0
+const SKYLINE_TRACK_CLEARANCE = 180
+const PADDY_TRACK_CLEARANCE = 140
+const LANDMARK_TRACK_CLEARANCE = 150
+const SCENERY_PUSH_EXTRA = 28
 
 const LOWER_ROAD_CUT_SAMPLES = (() => {
   const curve = new THREE.CatmullRomCurve3(
@@ -89,6 +113,50 @@ function distanceToTrackXZ(x: number, z: number): number {
   return best
 }
 
+function nearestTrackSampleXZ(x: number, z: number): THREE.Vector3 {
+  let best = TRACK_CLEARANCE_SAMPLES[0]
+  let bestDistance = Number.POSITIVE_INFINITY
+  for (const p of TRACK_CLEARANCE_SAMPLES) {
+    const distance = Math.hypot(p.x - x, p.z - z)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = p
+    }
+  }
+  return best
+}
+
+function isTooCloseToTrack(x: number, z: number, clearance: number): boolean {
+  return distanceToTrackXZ(x, z) < clearance
+}
+
+function safeSceneryPosition(x: number, y: number, z: number, clearance: number): THREE.Vector3 {
+  let safeX = x
+  let safeZ = z
+
+  for (let i = 0; i < 10; i += 1) {
+    const distance = distanceToTrackXZ(safeX, safeZ)
+    if (distance >= clearance) break
+
+    const nearest = nearestTrackSampleXZ(safeX, safeZ)
+    let dx = safeX - nearest.x
+    let dz = safeZ - nearest.z
+    let length = Math.hypot(dx, dz)
+
+    if (length < 0.001) {
+      dx = safeX - TRACK_SCENERY_BOUNDS.centerX
+      dz = safeZ - TRACK_SCENERY_BOUNDS.centerZ
+      length = Math.hypot(dx, dz) || 1
+    }
+
+    const push = clearance - distance + SCENERY_PUSH_EXTRA
+    safeX += (dx / length) * push
+    safeZ += (dz / length) * push
+  }
+
+  return new THREE.Vector3(safeX, y, safeZ)
+}
+
 function underpassCuttingGroundY(x: number, z: number): number {
   if (LOWER_ROAD_CUT_SAMPLES.length === 0) return 0
 
@@ -126,9 +194,9 @@ const S_CURVE_STANDS_POS = tracksidePosition(34, -42, -1.92, 92)
 const HAIRPIN_STANDS_POS = tracksidePosition(92, 118, -0.33, -110)
 const SPOON_STANDS_POS = tracksidePosition(-166, 158, 3.08, -112)
 const CASIO_STANDS_POS = tracksidePosition(170, 58, 2.71, -108)
-const FERRIS_WHEEL_POS = new THREE.Vector3(540, 13, 240)
-const PAGODA_GARDEN_POS = new THREE.Vector3(-342, 0, -256)
-const TORII_PLAZA_POS = new THREE.Vector3(500, 0, -260)
+const FERRIS_WHEEL_POS = safeSceneryPosition(540, 13, 240, LANDMARK_TRACK_CLEARANCE)
+const PAGODA_GARDEN_POS = safeSceneryPosition(-342, 0, -256, LANDMARK_TRACK_CLEARANCE)
+const TORII_PLAZA_POS = safeSceneryPosition(500, 0, -260, LANDMARK_TRACK_CLEARANCE)
 
 const SCENERY_CLEARINGS = [
   { x: FERRIS_WHEEL_POS.x, z: FERRIS_WHEEL_POS.z, inner: 34, outer: 78 },
@@ -163,7 +231,7 @@ function addRotatedCollider(
 }
 
 function buildGround(group: THREE.Group): void {
-  const geo = new THREE.PlaneGeometry(1400, 1400, 220, 220)
+  const geo = new THREE.PlaneGeometry(2200, 2200, 260, 260)
   geo.rotateX(-Math.PI / 2)
 
   const positions = geo.attributes.position as THREE.BufferAttribute
@@ -442,8 +510,9 @@ function buildPaddyTerraces(group: THREE.Group): void {
   tiers.forEach((t) => {
     const mat = new THREE.MeshStandardMaterial({ color: colors[t.tier % colors.length], roughness: 1.0, side: THREE.DoubleSide })
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(t.w, t.d), mat)
+    const safePos = safeSceneryPosition(t.x, 0, t.z, PADDY_TRACK_CLEARANCE)
     mesh.rotation.x = -Math.PI / 2
-    mesh.position.set(t.x, 0.018 + t.tier * 0.006, t.z)
+    mesh.position.set(safePos.x, 0.018 + t.tier * 0.006, safePos.z)
     mesh.castShadow = false
     mesh.receiveShadow = false
     group.add(mesh)
@@ -459,22 +528,30 @@ function buildTokyoSkyline(group: THREE.Group): void {
   const count = 130
   const mesh = new THREE.InstancedMesh(buildingGeo, cityMat, count)
   const dummy = new THREE.Object3D()
+  const skylineInnerRadius = TRACK_SCENERY_BOUNDS.radius + SKYLINE_TRACK_CLEARANCE + 40
+  const skylineRadiusSpread = 170
+  let placed = 0
 
   for (let i = 0; i < count; i += 1) {
     const angle = (i / count) * Math.PI * 2 + rand() * 0.05
-    const radius = 540 + rand() * 180
-    const x = Math.cos(angle) * radius
-    const z = Math.sin(angle) * radius * 0.9
+    const radius = skylineInnerRadius + rand() * skylineRadiusSpread
+    const x = TRACK_SCENERY_BOUNDS.centerX + Math.cos(angle) * radius
+    const z = TRACK_SCENERY_BOUNDS.centerZ + Math.sin(angle) * radius * 0.9
     if (z < -380 && Math.abs(x) < 480) continue // clear behind Fuji
     const w = 6 + rand() * 12
     const d = 6 + rand() * 12
     const h = 14 + rand() * 64
-    dummy.position.set(x, h / 2, z)
+    const safePos = isTooCloseToTrack(x, z, SKYLINE_TRACK_CLEARANCE)
+      ? safeSceneryPosition(x, h / 2, z, SKYLINE_TRACK_CLEARANCE)
+      : new THREE.Vector3(x, h / 2, z)
+    dummy.position.copy(safePos)
     dummy.rotation.set(0, rand() * Math.PI, 0)
     dummy.scale.set(w, h, d)
     dummy.updateMatrix()
-    mesh.setMatrixAt(i, dummy.matrix)
+    mesh.setMatrixAt(placed, dummy.matrix)
+    placed += 1
   }
+  mesh.count = placed
   mesh.instanceMatrix.needsUpdate = true
   group.add(mesh)
 }
