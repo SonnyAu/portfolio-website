@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { gsap } from "gsap"
 import * as THREE from "three"
 import { buildScene, type SceneRig } from "./f1/scene/buildScene"
-import { BRIDGE_THRESHOLD, getCircuitSectionAt, SUZUKA_LANDMARKS, SUZUKA_TRACK_POINTS } from "./f1/scene/track"
+import { BRIDGE_THRESHOLD, getCircuitSectionAt, SUZUKA_LANDMARKS, SUZUKA_PIT_LANE_POINTS, SUZUKA_TRACK_POINTS } from "./f1/scene/track"
 import type { Station } from "./f1/scene/stations"
 
 type Telemetry = {
@@ -32,6 +32,7 @@ const START_GRID = SUZUKA_LANDMARKS.startFinish
 const MINIMAP_WIDTH = 236
 const MINIMAP_HEIGHT = 132
 const MINIMAP_PAD = 10
+const STATION_STOP_SPEED = 1.0
 
 const MINIMAP_SAMPLES = (() => {
   const curve = new THREE.CatmullRomCurve3(
@@ -49,7 +50,25 @@ const MINIMAP_SAMPLES = (() => {
   return samples
 })()
 
-const MINIMAP_BOUNDS = MINIMAP_SAMPLES.reduce(
+const MINIMAP_PIT_LANE_SAMPLES = (() => {
+  const curve = new THREE.CatmullRomCurve3(
+    SUZUKA_PIT_LANE_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    false,
+    "centripetal",
+    0.5,
+  )
+  const samples: Array<{ x: number; y: number; z: number; t: number }> = []
+  for (let i = 0; i <= 90; i += 1) {
+    const t = i / 90
+    const point = curve.getPoint(t)
+    samples.push({ x: point.x, y: point.y, z: point.z, t })
+  }
+  return samples
+})()
+
+const MINIMAP_ROAD_SAMPLES = [...MINIMAP_SAMPLES, ...MINIMAP_PIT_LANE_SAMPLES]
+
+const MINIMAP_BOUNDS = MINIMAP_ROAD_SAMPLES.reduce(
   (bounds, point) => ({
     minX: Math.min(bounds.minX, point.x),
     maxX: Math.max(bounds.maxX, point.x),
@@ -77,6 +96,7 @@ const pointsToPolyline = (points: Array<{ x: number; z: number }>): string => (
 )
 
 const MINIMAP_TRACK_POLYLINE = pointsToPolyline(MINIMAP_SAMPLES)
+const MINIMAP_PIT_LANE_POLYLINE = pointsToPolyline(MINIMAP_PIT_LANE_SAMPLES)
 const MINIMAP_BRIDGE_POLYLINE = pointsToPolyline(MINIMAP_SAMPLES.filter((point) => point.y > BRIDGE_THRESHOLD))
 const MINIMAP_START = projectMinimapPoint(SUZUKA_LANDMARKS.startFinish.position[0], SUZUKA_LANDMARKS.startFinish.position[2])
 const DRIVE_BOUNDS_MARGIN = 90
@@ -91,6 +111,7 @@ export default function F1TrackPortfolio() {
   const mountRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const [activeStation, setActiveStation] = useState<Station | null>(null)
+  const [nearbyStation, setNearbyStation] = useState<Station | null>(null)
   const [stationsList, setStationsList] = useState<Station[]>([])
   const [telemetry, setTelemetry] = useState<Telemetry>({
     speed: 0,
@@ -115,6 +136,7 @@ export default function F1TrackPortfolio() {
     trackT: 0,
   })
   const activeStationRef = useRef<Station | null>(activeStation)
+  const nearbyStationRef = useRef<Station | null>(nearbyStation)
   const stationsRef = useRef<Station[]>([])
   const minimapCar = projectMinimapPoint(telemetry.carX, telemetry.carZ)
   const minimapStations = useMemo(() => stationsList.map((station) => ({
@@ -151,11 +173,18 @@ export default function F1TrackPortfolio() {
     }
   }, [])
 
+  const setNearbyResumeZone = useCallback((station: Station | null) => {
+    if (nearbyStationRef.current?.id === station?.id) return
+    nearbyStationRef.current = station
+    setNearbyStation(station)
+  }, [])
+
   const jumpToStation = useCallback((station: Station) => {
     const [x, , z] = station.position
     carState.current.x = x
     carState.current.z = z
     carState.current.y = station.position[1]
+    carState.current.heading = station.heading
     carState.current.velocity = 0
     carState.current.steering = 0
     carState.current.trackT = 0
@@ -176,6 +205,10 @@ export default function F1TrackPortfolio() {
   useEffect(() => {
     activeStationRef.current = activeStation
   }, [activeStation])
+
+  useEffect(() => {
+    nearbyStationRef.current = nearbyStation
+  }, [nearbyStation])
 
   useEffect(() => {
     const controls = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space"]
@@ -216,7 +249,7 @@ export default function F1TrackPortfolio() {
     stationsRef.current = stations
     setStationsList(stations)
 
-    const { sampler, trackHalfWidth } = track
+    const { sampler } = track
     const colliders = environment.colliders
     const CAR_HALF_WIDTH = 1.5
 
@@ -274,14 +307,15 @@ export default function F1TrackPortfolio() {
       // Track-following Y elevation: drive up the ramp onto the bridge, drop back to ground when off it.
       const ground = sampler.getGroundAt(state.x, state.z, state.y, state.trackT)
       state.trackT = ground.t
-      const onTrack = ground.distance < trackHalfWidth + 0.5
+      const roadHalfWidth = ground.roadHalfWidth
+      const onTrack = ground.distance < roadHalfWidth + 0.5
       const targetY = onTrack ? ground.y : 0
       const climbingRamp = targetY > state.y + 0.08
       const yFollowRate = targetY > 0.5 || state.y > 0.5 ? (climbingRamp ? 34 : 24) : 10
       state.y += (targetY - state.y) * Math.min(1, yFollowRate * delta)
 
       // Soft grass slowdown: exponential drag scales with how far off the track we are.
-      const offTrackBy = Math.max(0, ground.distance - trackHalfWidth)
+      const offTrackBy = Math.max(0, ground.distance - roadHalfWidth)
       if (offTrackBy > 0) {
         const grassDrag = Math.pow(0.93, delta * 60 * Math.min(2, 1 + offTrackBy * 0.1))
         state.velocity *= grassDrag
@@ -348,9 +382,16 @@ export default function F1TrackPortfolio() {
       // Station proximity check
       const proximity = nearestStation(state.x, state.z)
       if (proximity.station) {
-        const shouldShow = proximity.distance <= proximity.station.zoneRadius
-        if (shouldShow && proximity.station.id !== activeStationRef.current?.id) revealStation(proximity.station)
-        if (!shouldShow && activeStationRef.current) revealStation(null)
+        const insideZone = proximity.distance <= proximity.station.zoneRadius
+        const isStopped = Math.abs(state.velocity) <= STATION_STOP_SPEED
+        if (insideZone) {
+          setNearbyResumeZone(proximity.station)
+          if (isStopped && proximity.station.id !== activeStationRef.current?.id) revealStation(proximity.station)
+          if (!isStopped && activeStationRef.current && proximity.station.id !== activeStationRef.current.id) revealStation(null)
+        } else {
+          setNearbyResumeZone(null)
+          if (activeStationRef.current) revealStation(null)
+        }
       }
 
       if (time - lastTelemetryRender > 110) {
@@ -359,7 +400,7 @@ export default function F1TrackPortfolio() {
           speed: Math.round(Math.abs(state.velocity) * 6.5),
           gear: Math.max(1, Math.min(8, Math.ceil(Math.abs(state.velocity) / 7))),
           rpm: Math.round(1200 + Math.abs(state.velocity) * 360),
-          section: getCircuitSectionAt(ground.t, state.y),
+          section: ground.road === "pitlane" ? "PIT LANE" : getCircuitSectionAt(ground.t, state.y),
           trackT: ground.t,
           carX: state.x,
           carY: state.y,
@@ -381,7 +422,7 @@ export default function F1TrackPortfolio() {
       window.removeEventListener("resize", resize)
       rig?.dispose()
     }
-  }, [nearestStation, revealStation])
+  }, [nearestStation, revealStation, setNearbyResumeZone])
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-[#1a1740] text-white">
@@ -418,6 +459,7 @@ export default function F1TrackPortfolio() {
           >
             <polyline points={MINIMAP_TRACK_POLYLINE} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
             <polyline points={MINIMAP_TRACK_POLYLINE} fill="none" stroke="#111820" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={MINIMAP_PIT_LANE_POLYLINE} fill="none" stroke="rgba(0,210,190,0.45)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             <polyline points={MINIMAP_BRIDGE_POLYLINE} fill="none" stroke="#00D2BE" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
             <line x1={MINIMAP_START.x - 4} y1={MINIMAP_START.y} x2={MINIMAP_START.x + 4} y2={MINIMAP_START.y} stroke="#f5f5f5" strokeWidth="2" />
             {minimapStations.map((station) => (
@@ -451,6 +493,12 @@ export default function F1TrackPortfolio() {
           </div>
         ) : null}
       </aside>
+
+      {nearbyStation && !activeStation ? (
+        <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2 rounded-full border border-[#00D2BE]/35 bg-black/70 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[#00D2BE] shadow-xl shadow-[#00D2BE]/10 backdrop-blur">
+          Stop to unlock {nearbyStation.label}
+        </div>
+      ) : null}
 
       <div className="absolute bottom-4 left-4 z-10 hidden rounded-full border border-white/10 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-neutral-300 backdrop-blur md:block">
         Controls: W accelerate - S brake/reverse - A/D steer - Space slow - stop in a glowing zone to open a modal

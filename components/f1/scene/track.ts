@@ -4,13 +4,25 @@ import { PALETTE } from "./palette"
 export type TrackSystem = {
   group: THREE.Group
   curve: THREE.CatmullRomCurve3
+  pitLaneCurve: THREE.CatmullRomCurve3
   startFinish: THREE.Vector3
   sampler: TrackSampler
   trackHalfWidth: number
 }
 
+export type TrackRoad = "main" | "pitlane"
+
+export type TrackSample = {
+  y: number
+  distance: number
+  t: number
+  layer: TrackLayer
+  road: TrackRoad
+  roadHalfWidth: number
+}
+
 export type TrackSampler = {
-  getGroundAt: (x: number, z: number, currentY: number, previousT?: number) => { y: number; distance: number; t: number; layer: TrackLayer }
+  getGroundAt: (x: number, z: number, currentY: number, previousT?: number) => TrackSample
 }
 
 export type TrackLandmark = {
@@ -71,9 +83,24 @@ export const SCALE_Z = 2.6
 export const TRACK_HALF_WIDTH = 6.0
 export const PAVED_HALF_WIDTH = TRACK_HALF_WIDTH + 4.8
 export const START_FINISH_GANTRY_POLE_OFFSET = TRACK_HALF_WIDTH + 2.6
+export const PIT_LANE_WIDTH = 7.0
+export const PIT_LANE_HALF_WIDTH = PIT_LANE_WIDTH * 0.5
+const PIT_LANE_BODY_SEPARATION = 5.2
+const PIT_LANE_MOUTH_SEPARATION = 0.45
+const PIT_WALL_CENTER_OFFSET = TRACK_HALF_WIDTH + PIT_LANE_BODY_SEPARATION * 0.5
+const PIT_LANE_BODY_CENTER_OFFSET = TRACK_HALF_WIDTH + PIT_LANE_BODY_SEPARATION + PIT_LANE_HALF_WIDTH
+const PIT_LANE_MOUTH_CENTER_OFFSET = TRACK_HALF_WIDTH + PIT_LANE_MOUTH_SEPARATION + PIT_LANE_HALF_WIDTH
+const PIT_LANE_GUIDE_START_T = 0.035
+const PIT_LANE_GUIDE_END_T = 0.865
+const PIT_LANE_ENTRY_BLEND_END_T = 0.22
+const PIT_LANE_EXIT_BLEND_START_T = 0.72
+const PIT_LANE_PAINT_START_T = 0.2
+const PIT_LANE_PAINT_END_T = 0.8
 const TRACK_WIDTH = 12.0
 const TRACK_SURFACE_Y_OFFSET = 0.04
 const PAINT_Y_OFFSET = 0.075
+const PIT_LANE_SURFACE_Y_OFFSET = 0.045
+const PIT_LANE_PAINT_Y_OFFSET = 0.082
 const GROUND_DETAIL_Y_OFFSET = 0.03
 const GROUND_DETAIL_MAX_Y = 0.18
 const KERB_HALF = 6.0
@@ -96,6 +123,39 @@ const LOWER_CUT_SURFACE_CLIP_Y = -0.05
 
 const toWorldPosition = (x: number, y: number, z: number): [number, number, number] => [x * SCALE_X, y, z * SCALE_Z]
 const toWorldVector = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(...toWorldPosition(x, y, z))
+
+function smoothStep01(value: number): number {
+  const t = THREE.MathUtils.clamp(value, 0, 1)
+  return t * t * (3 - 2 * t)
+}
+
+function pitLaneCenterOffsetAt(t: number): number {
+  if (t <= PIT_LANE_ENTRY_BLEND_END_T) {
+    return THREE.MathUtils.lerp(
+      PIT_LANE_MOUTH_CENTER_OFFSET,
+      PIT_LANE_BODY_CENTER_OFFSET,
+      smoothStep01((t - PIT_LANE_GUIDE_START_T) / (PIT_LANE_ENTRY_BLEND_END_T - PIT_LANE_GUIDE_START_T)),
+    )
+  }
+
+  if (t >= PIT_LANE_EXIT_BLEND_START_T) {
+    return THREE.MathUtils.lerp(
+      PIT_LANE_BODY_CENTER_OFFSET,
+      PIT_LANE_MOUTH_CENTER_OFFSET,
+      smoothStep01((t - PIT_LANE_EXIT_BLEND_START_T) / (PIT_LANE_GUIDE_END_T - PIT_LANE_EXIT_BLEND_START_T)),
+    )
+  }
+
+  return PIT_LANE_BODY_CENTER_OFFSET
+}
+
+function pitLaneInnerEdgeOffsetAt(t: number): number {
+  return pitLaneCenterOffsetAt(t) - PIT_LANE_HALF_WIDTH
+}
+
+function pitLaneHalfWidthAt(_t: number): number {
+  return PIT_LANE_HALF_WIDTH
+}
 
 export const SUZUKA_LANDMARKS: Record<
   "startFinish" | "turnOneTwo" | "sCurves" | "hairpin" | "spoon" | "casioTriangle",
@@ -224,6 +284,102 @@ export const SUZUKA_TRACK_POINTS: Array<[number, number, number]> = TRACK_POINTS
   toWorldPosition(x, y, z)
 ))
 
+const PIT_STRAIGHT_GUIDE_POINTS: Array<[number, number, number]> = [
+  [102, 0, -18],
+  [118, 0, -24],
+  [126, 0, -24],
+  [140, 0, 4],
+  [156, 0, 42],
+  [172, 0, 84],
+  [184, 0, 116],
+  [188, 0, 138],
+  [180, 0, 154],
+]
+
+const PIT_STRAIGHT_GUIDE_CURVE = new THREE.CatmullRomCurve3(
+  PIT_STRAIGHT_GUIDE_POINTS.map(([x, y, z]) => toWorldVector(x, y, z)),
+  false,
+  "centripetal",
+  0.5,
+)
+
+const PIT_LANE_SAMPLE_T_VALUES = [
+  PIT_LANE_GUIDE_START_T,
+  0.075,
+  0.12,
+  0.175,
+  0.23,
+  0.3,
+  0.37,
+  0.44,
+  0.51,
+  0.58,
+  0.65,
+  0.72,
+  0.775,
+  0.82,
+  PIT_LANE_GUIDE_END_T,
+]
+
+const PIT_LANE_RESUME_ZONE_DEFS = [
+  { id: "about", label: "01 / ABOUT", t: 0.34 },
+  { id: "experience", label: "02 / EXPERIENCE", t: 0.42 },
+  { id: "skills", label: "03 / SKILLS", t: 0.5 },
+  { id: "projects", label: "04 / PROJECTS", t: 0.58 },
+  { id: "contact", label: "05 / CONTACT", t: 0.66 },
+] as const
+
+const PIT_LANE_RESUME_ZONE_TS = PIT_LANE_RESUME_ZONE_DEFS.map((zone) => zone.t)
+
+function getPitLaneWorldPointAt(t: number): THREE.Vector3 {
+  const point = PIT_STRAIGHT_GUIDE_CURVE.getPoint(t)
+  const tangent = PIT_STRAIGHT_GUIDE_CURVE.getTangent(t).normalize()
+  const side = new THREE.Vector3(tangent.z, 0, -tangent.x).normalize()
+  const offset = pitLaneCenterOffsetAt(t)
+  return new THREE.Vector3(point.x + side.x * offset, 0, point.z + side.z * offset)
+}
+
+function vectorToWorldPosition(vector: THREE.Vector3): [number, number, number] {
+  return [vector.x, vector.y, vector.z]
+}
+
+function worldToRawPosition([x, y, z]: [number, number, number]): [number, number, number] {
+  return [x / SCALE_X, y, z / SCALE_Z]
+}
+
+const PIT_LANE_WORLD_POINTS: Array<[number, number, number]> = PIT_LANE_SAMPLE_T_VALUES.map((t) => (
+  vectorToWorldPosition(getPitLaneWorldPointAt(t))
+))
+
+// Kept as a raw-coordinate export, but derived from the pit-straight guide instead of hand-drawn points.
+export const PIT_LANE_POINTS: Array<[number, number, number]> = PIT_LANE_WORLD_POINTS.map(worldToRawPosition)
+
+export const SUZUKA_PIT_LANE_POINTS: Array<[number, number, number]> = PIT_LANE_WORLD_POINTS
+
+const PIT_LANE_EXPORT_CURVE = new THREE.CatmullRomCurve3(
+  SUZUKA_PIT_LANE_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+  false,
+  "centripetal",
+  0.5,
+)
+
+function getPitLaneHeadingAt(t: number): number {
+  const tangent = PIT_LANE_EXPORT_CURVE.getTangent(t).normalize()
+  return Math.atan2(tangent.x, tangent.z)
+}
+
+export const PIT_LANE_RESUME_ZONES: ReadonlyArray<{
+  id: (typeof PIT_LANE_RESUME_ZONE_DEFS)[number]["id"]
+  label: (typeof PIT_LANE_RESUME_ZONE_DEFS)[number]["label"]
+  position: [number, number, number]
+  heading: number
+}> = PIT_LANE_RESUME_ZONE_DEFS.map((zone) => ({
+  id: zone.id,
+  label: zone.label,
+  position: vectorToWorldPosition(PIT_LANE_EXPORT_CURVE.getPoint(zone.t)),
+  heading: getPitLaneHeadingAt(zone.t),
+}))
+
 type RibbonOptions = {
   curve: THREE.CatmullRomCurve3
   width: number
@@ -317,6 +473,118 @@ function buildThickRibbon(opts: RibbonOptions): THREE.Mesh {
 
   const mesh = new THREE.Mesh(geo, [topMaterial, sideMaterial])
   mesh.castShadow = true
+  mesh.receiveShadow = false
+  return mesh
+}
+
+function buildFlatRibbon(
+  curve: THREE.CatmullRomCurve3,
+  width: number | ((t: number) => number),
+  samples: number,
+  yOffset: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples
+    const point = curve.getPoint(t)
+    const tangent = curve.getTangent(t).normalize()
+    const sideX = tangent.z
+    const sideZ = -tangent.x
+    const halfW = (typeof width === "function" ? width(t) : width) * 0.5
+
+    positions.push(point.x + sideX * halfW, point.y + yOffset, point.z + sideZ * halfW)
+    positions.push(point.x - sideX * halfW, point.y + yOffset, point.z - sideZ * halfW)
+    normals.push(0, 1, 0, 0, 1, 0)
+    uvs.push(0, t * 18, 1, t * 18)
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = i * 2; const b = a + 1; const c = a + 2; const d = a + 3
+    indices.push(a, b, c, b, d, c)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  geo.computeBoundingSphere()
+
+  const mesh = new THREE.Mesh(geo, material)
+  mesh.receiveShadow = false
+  return mesh
+}
+
+function buildVariableOffsetBand(
+  curve: THREE.CatmullRomCurve3,
+  innerOffset: number | ((t: number) => number),
+  outerOffset: number | ((t: number) => number),
+  samples: number,
+  yOffset: number,
+  material: THREE.Material,
+  startT = 0,
+  endT = 1,
+): THREE.Mesh {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const sampleVerts: Array<{ inner: number; outer: number; valid: boolean }> = []
+  const safeStartT = THREE.MathUtils.clamp(startT, 0, 1)
+  const safeEndT = THREE.MathUtils.clamp(endT, safeStartT, 1)
+  const resolveOffset = (offset: number | ((t: number) => number), t: number) => (
+    typeof offset === "function" ? offset(t) : offset
+  )
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = THREE.MathUtils.lerp(safeStartT, safeEndT, i / samples)
+    const point = curve.getPoint(t)
+    const tangent = curve.getTangent(t).normalize()
+    const sideX = tangent.z
+    const sideZ = -tangent.x
+    const inner = resolveOffset(innerOffset, t)
+    const outer = resolveOffset(outerOffset, t)
+
+    if (outer <= inner + 0.04) {
+      sampleVerts.push({ inner: -1, outer: -1, valid: false })
+      continue
+    }
+
+    const outerIdx = positions.length / 3
+    positions.push(point.x + sideX * outer, point.y + yOffset, point.z + sideZ * outer)
+    normals.push(0, 1, 0)
+    uvs.push(1, t * 16)
+
+    const innerIdx = positions.length / 3
+    positions.push(point.x + sideX * inner, point.y + yOffset, point.z + sideZ * inner)
+    normals.push(0, 1, 0)
+    uvs.push(0, t * 16)
+
+    sampleVerts.push({ inner: innerIdx, outer: outerIdx, valid: true })
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = sampleVerts[i]
+    const b = sampleVerts[i + 1]
+    if (!a.valid || !b.valid) continue
+    indices.push(a.outer, a.inner, b.outer, a.inner, b.inner, b.outer)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  geo.computeBoundingSphere()
+
+  const mesh = new THREE.Mesh(geo, material)
   mesh.receiveShadow = false
   return mesh
 }
@@ -505,6 +773,178 @@ function buildPaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): v
     dash.rotation.y = Math.atan2(tan.x, tan.z)
     group.add(dash)
   }
+}
+
+function buildCurveStrip(
+  curve: THREE.CatmullRomCurve3,
+  centerOffset: number,
+  stripWidth: number,
+  samples: number,
+  yOffset: number,
+  material: THREE.Material,
+  startT = 0,
+  endT = 1,
+): THREE.Mesh {
+  const positions: number[] = []
+  const normals: number[] = []
+  const indices: number[] = []
+  const safeStartT = THREE.MathUtils.clamp(startT, 0, 1)
+  const safeEndT = THREE.MathUtils.clamp(endT, safeStartT, 1)
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = THREE.MathUtils.lerp(safeStartT, safeEndT, i / samples)
+    const p = curve.getPoint(t)
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z
+    const sz = -tan.x
+    const centerX = p.x + sx * centerOffset
+    const centerZ = p.z + sz * centerOffset
+    const halfStrip = stripWidth * 0.5
+
+    positions.push(centerX + sx * halfStrip, p.y + yOffset, centerZ + sz * halfStrip)
+    positions.push(centerX - sx * halfStrip, p.y + yOffset, centerZ - sz * halfStrip)
+    normals.push(0, 1, 0, 0, 1, 0)
+  }
+
+  for (let i = 0; i < samples; i += 1) {
+    const a = i * 2; const b = a + 1; const c = a + 2; const d = a + 3
+    indices.push(a, b, c, b, d, c)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3))
+  geo.setIndex(indices)
+  geo.computeBoundingSphere()
+
+  return new THREE.Mesh(geo, material)
+}
+
+function buildPitLanePaintedLines(curve: THREE.CatmullRomCurve3, group: THREE.Group): void {
+  const whiteEdge = new THREE.MeshBasicMaterial({
+    color: PALETTE.trackWhite,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+  })
+  const tealAccent = new THREE.MeshBasicMaterial({
+    color: PALETTE.mercedesTeal,
+    transparent: true,
+    opacity: 0.72,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+  })
+  const mergeGuide = new THREE.MeshBasicMaterial({
+    color: PALETTE.trackYellow,
+    transparent: true,
+    opacity: 0.74,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+  })
+
+  const samples = 220
+  group.add(buildCurveStrip(curve, PIT_LANE_HALF_WIDTH - 0.28, 0.16, samples, PIT_LANE_PAINT_Y_OFFSET, whiteEdge, PIT_LANE_PAINT_START_T, PIT_LANE_PAINT_END_T))
+  group.add(buildCurveStrip(curve, -PIT_LANE_HALF_WIDTH + 0.28, 0.16, samples, PIT_LANE_PAINT_Y_OFFSET, whiteEdge, PIT_LANE_PAINT_START_T, PIT_LANE_PAINT_END_T))
+  group.add(buildCurveStrip(curve, 0, 0.1, samples, PIT_LANE_PAINT_Y_OFFSET + 0.006, tealAccent, PIT_LANE_PAINT_START_T, PIT_LANE_PAINT_END_T))
+
+  ;[0.055, 0.09, 0.125, 0.16, 0.84, 0.875, 0.91, 0.945].forEach((t) => {
+    const p = curve.getPoint(t)
+    const tan = curve.getTangent(t).normalize()
+    const guide = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 1.55), mergeGuide)
+    guide.position.set(p.x, p.y + PIT_LANE_PAINT_Y_OFFSET + 0.018, p.z)
+    guide.rotation.y = Math.atan2(tan.x, tan.z)
+    group.add(guide)
+  })
+}
+
+function buildPitLaneDetails(curve: THREE.CatmullRomCurve3, guideCurve: THREE.CatmullRomCurve3, group: THREE.Group): void {
+  const wallMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDeck, roughness: 0.78, metalness: 0.06 })
+  const wallDarkMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.84, metalness: 0.04 })
+  const wallStripeMat = new THREE.MeshBasicMaterial({ color: PALETTE.mercedesTeal, transparent: true, opacity: 0.78 })
+  const garageMat = new THREE.MeshStandardMaterial({ color: PALETTE.carbonGrey, roughness: 0.72, metalness: 0.12 })
+  const garageDoorMat = new THREE.MeshStandardMaterial({ color: PALETTE.silver, roughness: 0.66, metalness: 0.24 })
+  const arrowMat = new THREE.MeshBasicMaterial({ color: PALETTE.trackYellow, transparent: true, opacity: 0.82 })
+
+  const garageSide = 1
+  const markerTs = PIT_LANE_RESUME_ZONE_TS
+  const wallStartI = Math.ceil(0.24 * 260)
+  const wallEndI = Math.floor(0.7 * 260)
+
+  for (let i = wallStartI, wallIndex = 0; i <= wallEndI; i += 2, wallIndex += 1) {
+    const t = i / 260
+    const p = guideCurve.getPoint(t)
+    const tan = guideCurve.getTangent(t).normalize()
+    const sx = tan.z
+    const sz = -tan.x
+    const yaw = Math.atan2(tan.x, tan.z)
+
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.08, 4.8), wallIndex % 5 === 0 ? wallDarkMat : wallMat)
+    wall.position.set(
+      p.x + sx * PIT_WALL_CENTER_OFFSET,
+      0.56,
+      p.z + sz * PIT_WALL_CENTER_OFFSET,
+    )
+    wall.rotation.y = yaw
+    wall.castShadow = true
+    wall.receiveShadow = true
+    group.add(wall)
+
+    if (wallIndex % 2 === 0) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.1, 3.4), wallStripeMat)
+      stripe.position.set(wall.position.x, 1.12, wall.position.z)
+      stripe.rotation.y = yaw
+      group.add(stripe)
+    }
+  }
+
+  markerTs.forEach((t, i) => {
+    const p = curve.getPoint(t)
+    const tan = curve.getTangent(t).normalize()
+    const sx = tan.z
+    const sz = -tan.x
+    const yaw = Math.atan2(tan.x, tan.z)
+
+    const garage = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.3, 7.2), garageMat)
+    garage.position.set(
+      p.x + sx * garageSide * (PIT_LANE_HALF_WIDTH + 5.2),
+      1.15,
+      p.z + sz * garageSide * (PIT_LANE_HALF_WIDTH + 5.2),
+    )
+    garage.rotation.y = yaw
+    garage.castShadow = true
+    garage.receiveShadow = true
+    group.add(garage)
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.45, 0.16), garageDoorMat)
+    door.position.set(
+      p.x + sx * garageSide * (PIT_LANE_HALF_WIDTH + 2.58),
+      0.82,
+      p.z + sz * garageSide * (PIT_LANE_HALF_WIDTH + 2.58),
+    )
+    door.rotation.y = yaw + Math.PI / 2
+    group.add(door)
+
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.35, 3), arrowMat)
+    arrow.position.set(
+      p.x + tan.x * 2.2,
+      PIT_LANE_PAINT_Y_OFFSET + 0.03,
+      p.z + tan.z * 2.2,
+    )
+    arrow.rotation.x = Math.PI / 2
+    arrow.rotation.z = -yaw
+    arrow.scale.setScalar(i === 0 ? 1.2 : 1)
+    group.add(arrow)
+  })
 }
 
 type UnderpassVoid = {
@@ -993,7 +1433,7 @@ function buildStartFinish(curve: THREE.CatmullRomCurve3, group: THREE.Group): TH
   return point.clone()
 }
 
-function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
+function buildTrackSampler(curve: THREE.CatmullRomCurve3, pitLaneCurve: THREE.CatmullRomCurve3): TrackSampler {
   const samples = 720
   const xs = new Float32Array(samples)
   const ys = new Float32Array(samples)
@@ -1003,6 +1443,15 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
     xs[i] = p.x
     ys[i] = p.y
     zs[i] = p.z
+  }
+
+  const pitSamples = 220
+  const pitXs = new Float32Array(pitSamples + 1)
+  const pitZs = new Float32Array(pitSamples + 1)
+  for (let i = 0; i <= pitSamples; i += 1) {
+    const p = pitLaneCurve.getPoint(i / pitSamples)
+    pitXs[i] = p.x
+    pitZs[i] = p.z
   }
 
   const progressDistance = (a: number, b: number): number => {
@@ -1021,6 +1470,18 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
         if (d < nearestD) {
           nearestD = d
           nearestI = i
+        }
+      }
+
+      let pitI = 0
+      let pitD = Number.POSITIVE_INFINITY
+      for (let i = 0; i <= pitSamples; i += 1) {
+        const dx = pitXs[i] - x
+        const dz = pitZs[i] - z
+        const d = Math.sqrt(dx * dx + dz * dz)
+        if (d < pitD) {
+          pitD = d
+          pitI = i
         }
       }
 
@@ -1103,14 +1564,49 @@ function buildTrackSampler(curve: THREE.CatmullRomCurve3): TrackSampler {
 
       const dx = xs[bestI] - x
       const dz = zs[bestI] - z
-      return {
+      const mainDistance = Math.sqrt(dx * dx + dz * dz)
+      const mainSample: TrackSample = {
         y: ys[bestI],
-        distance: Math.sqrt(dx * dx + dz * dz),
+        distance: mainDistance,
         t: bestI / samples,
         layer: ys[bestI] > 0.2 ? "elevated" : "ground",
+        road: "main",
+        roadHalfWidth: PAVED_HALF_WIDTH,
       }
+
+      const pitT = pitI / pitSamples
+      const pitHalfWidth = pitLaneHalfWidthAt(pitT)
+      const pitIsUsable = currentY < 1.05 && pitD <= pitHalfWidth + 0.5
+      const pitIsCloser = pitD < mainSample.distance
+      if (pitIsUsable && pitIsCloser) {
+        return {
+          y: 0,
+          distance: pitD,
+          t: pitT,
+          layer: "ground",
+          road: "pitlane",
+          roadHalfWidth: pitHalfWidth,
+        }
+      }
+
+      return mainSample
     },
   }
+}
+
+function createTrackAsphaltMaterial(): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    color: PALETTE.asphalt,
+    roughness: 0.85,
+    metalness: 0.0,
+    emissive: new THREE.Color("#000000"),
+    emissiveIntensity: 0.0,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  })
+  material.fog = false
+  return material
 }
 
 export function buildSuzukaTrack(): TrackSystem {
@@ -1120,6 +1616,12 @@ export function buildSuzukaTrack(): TrackSystem {
   const curve = new THREE.CatmullRomCurve3(
     SUZUKA_TRACK_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     true,
+    "centripetal",
+    0.5,
+  )
+  const pitLaneCurve = new THREE.CatmullRomCurve3(
+    SUZUKA_PIT_LANE_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    false,
     "centripetal",
     0.5,
   )
@@ -1142,17 +1644,7 @@ export function buildSuzukaTrack(): TrackSystem {
   addMirroredSurfaceBands(group, curve, TRACK_HALF_WIDTH + 5.1, TRACK_HALF_WIDTH + 6.7, 600, GROUND_DETAIL_Y_OFFSET, gravelMat, underpass)
 
   // Main asphalt deck (thick so the bridge has a visible solid underside)
-  const trackTopMat = new THREE.MeshStandardMaterial({
-    color: PALETTE.asphalt,
-    roughness: 0.85,
-    metalness: 0.0,
-    emissive: new THREE.Color("#000000"),
-    emissiveIntensity: 0.0,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
-  })
-  trackTopMat.fog = false
+  const trackTopMat = createTrackAsphaltMaterial()
   const trackMesh = buildThickRibbon({
     curve,
     width: TRACK_WIDTH,
@@ -1164,6 +1656,49 @@ export function buildSuzukaTrack(): TrackSystem {
   })
   group.add(trackMesh)
 
+  const pitLaneConnectorMat = trackTopMat
+  const pitLaneConnectorInnerOffset = TRACK_HALF_WIDTH + 0.04
+  const pitLaneConnectorOuterOffset = (t: number) => pitLaneInnerEdgeOffsetAt(t) + 0.04
+  group.add(buildVariableOffsetBand(
+    PIT_STRAIGHT_GUIDE_CURVE,
+    pitLaneConnectorInnerOffset,
+    pitLaneConnectorOuterOffset,
+    90,
+    PIT_LANE_SURFACE_Y_OFFSET - 0.003,
+    pitLaneConnectorMat,
+    PIT_LANE_GUIDE_START_T,
+    0.26,
+  ))
+  group.add(buildVariableOffsetBand(
+    PIT_STRAIGHT_GUIDE_CURVE,
+    pitLaneConnectorInnerOffset,
+    pitLaneConnectorOuterOffset,
+    90,
+    PIT_LANE_SURFACE_Y_OFFSET - 0.003,
+    pitLaneConnectorMat,
+    PIT_LANE_EXIT_BLEND_START_T,
+    PIT_LANE_GUIDE_END_T,
+  ))
+
+  const pitWallBaseMat = new THREE.MeshStandardMaterial({ color: PALETTE.concreteDark, roughness: 0.88, metalness: 0.04 })
+  pitWallBaseMat.fog = false
+  group.add(buildVariableOffsetBand(
+    PIT_STRAIGHT_GUIDE_CURVE,
+    PIT_WALL_CENTER_OFFSET - 0.55,
+    PIT_WALL_CENTER_OFFSET + 0.55,
+    160,
+    PIT_LANE_SURFACE_Y_OFFSET + 0.002,
+    pitWallBaseMat,
+    0.24,
+    0.7,
+  ))
+
+  const pitLaneTopMat = trackTopMat
+  const pitLaneMesh = buildFlatRibbon(pitLaneCurve, PIT_LANE_WIDTH, 260, PIT_LANE_SURFACE_Y_OFFSET, pitLaneTopMat)
+  group.add(pitLaneMesh)
+  buildPitLanePaintedLines(pitLaneCurve, group)
+  buildPitLaneDetails(pitLaneCurve, PIT_STRAIGHT_GUIDE_CURVE, group)
+
   buildPaintedLines(curve, group)
   buildKerbs(curve, group)
   buildBridgeSupports(curve, group, underpass)
@@ -1172,7 +1707,7 @@ export function buildSuzukaTrack(): TrackSystem {
 
   void concreteUnderMat
 
-  const sampler = buildTrackSampler(curve)
+  const sampler = buildTrackSampler(curve, pitLaneCurve)
 
-  return { group, curve, startFinish, sampler, trackHalfWidth: PAVED_HALF_WIDTH }
+  return { group, curve, pitLaneCurve, startFinish, sampler, trackHalfWidth: PAVED_HALF_WIDTH }
 }
