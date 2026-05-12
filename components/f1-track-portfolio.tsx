@@ -106,6 +106,13 @@ const DRIVE_BOUNDS = {
   minZ: MINIMAP_BOUNDS.minZ - DRIVE_BOUNDS_MARGIN,
   maxZ: MINIMAP_BOUNDS.maxZ + DRIVE_BOUNDS_MARGIN,
 }
+const TELEMETRY_RENDER_INTERVAL = 180
+const STABILITY_WARMUP_MS = 3000
+const STABILITY_SAMPLE_SIZE = 150
+const STABILITY_BAD_FRAME_MS = 36
+const STABILITY_AVG_FRAME_MS = 28
+const STABILITY_BAD_FRAME_RATIO = 0.38
+const STABILITY_WINDOWS_BEFORE_FALLBACK = 3
 
 export default function F1TrackPortfolio() {
   const mountRef = useRef<HTMLDivElement>(null)
@@ -139,6 +146,7 @@ export default function F1TrackPortfolio() {
   const activeStationRef = useRef<Station | null>(activeStation)
   const nearbyStationRef = useRef<Station | null>(nearbyStation)
   const stationsRef = useRef<Station[]>([])
+  const telemetryRef = useRef<Telemetry>(telemetry)
   const minimapCar = projectMinimapPoint(telemetry.carX, telemetry.carZ)
   const minimapStations = useMemo(() => stationsList.map((station) => ({
     id: station.id,
@@ -161,6 +169,7 @@ export default function F1TrackPortfolio() {
   }, [])
 
   const revealStation = useCallback((station: Station | null) => {
+    if (activeStationRef.current?.id === station?.id) return
     activeStationRef.current = station
     setActiveStation(station)
     if (station) {
@@ -208,6 +217,10 @@ export default function F1TrackPortfolio() {
   }, [activeStation])
 
   useEffect(() => {
+    telemetryRef.current = telemetry
+  }, [telemetry])
+
+  useEffect(() => {
     nearbyStationRef.current = nearbyStation
   }, [nearbyStation])
 
@@ -238,6 +251,7 @@ export default function F1TrackPortfolio() {
     let rig: SceneRig | null = null
     let animationFrame = 0
     let cancelled = false
+    let pageVisible = document.visibilityState === "visible"
 
     try {
       rig = buildScene(mountRef.current)
@@ -270,14 +284,56 @@ export default function F1TrackPortfolio() {
     let lastTime = performance.now()
     let lastTelemetryRender = 0
     let cameraShakeIntensity = 0
+    let unstableWindows = 0
+    let stabilityFrameCount = 0
+    let stabilitySlowFrames = 0
+    let stabilityTotalFrameTime = 0
+    const stabilityStartTime = performance.now() + STABILITY_WARMUP_MS
 
     const tmpCamTarget = new THREE.Vector3()
     const tmpLookAt = new THREE.Vector3()
 
+    const updateRenderStability = (frameMs: number, time: number) => {
+      if (!rig || rig.renderQuality === "stable" || time < stabilityStartTime) return
+
+      stabilityFrameCount += 1
+      stabilityTotalFrameTime += frameMs
+      if (frameMs > STABILITY_BAD_FRAME_MS) stabilitySlowFrames += 1
+
+      if (stabilityFrameCount < STABILITY_SAMPLE_SIZE) return
+
+      const averageFrameTime = stabilityTotalFrameTime / stabilityFrameCount
+      const slowFrameRatio = stabilitySlowFrames / stabilityFrameCount
+      const unstable = averageFrameTime > STABILITY_AVG_FRAME_MS || slowFrameRatio > STABILITY_BAD_FRAME_RATIO
+
+      unstableWindows = unstable ? unstableWindows + 1 : Math.max(0, unstableWindows - 1)
+      stabilityFrameCount = 0
+      stabilitySlowFrames = 0
+      stabilityTotalFrameTime = 0
+
+      if (unstableWindows >= STABILITY_WINDOWS_BEFORE_FALLBACK) {
+        rig.applyRenderQuality("stable")
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      pageVisible = document.visibilityState === "visible"
+      lastTime = performance.now()
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
     const animate = (time: number) => {
       if (cancelled || !rig) return
-      const delta = Math.min((time - lastTime) / 1000, 0.05)
+      if (!pageVisible) {
+        lastTime = time
+        animationFrame = requestAnimationFrame(animate)
+        return
+      }
+
+      const frameMs = time - lastTime
+      const delta = Math.min(frameMs / 1000, 0.05)
       lastTime = time
+      updateRenderStability(frameMs, time)
 
       const state = carState.current
       const input = keys.current
@@ -395,9 +451,9 @@ export default function F1TrackPortfolio() {
         }
       }
 
-      if (time - lastTelemetryRender > 110) {
+      if (time - lastTelemetryRender > TELEMETRY_RENDER_INTERVAL) {
         lastTelemetryRender = time
-        setTelemetry({
+        const nextTelemetry = {
           speed: Math.round(Math.abs(state.velocity) * 6.5),
           gear: Math.max(1, Math.min(8, Math.ceil(Math.abs(state.velocity) / 7))),
           rpm: Math.round(1200 + Math.abs(state.velocity) * 360),
@@ -406,7 +462,20 @@ export default function F1TrackPortfolio() {
           carX: state.x,
           carY: state.y,
           carZ: state.z,
-        })
+        }
+        const previousTelemetry = telemetryRef.current
+        if (
+          nextTelemetry.speed !== previousTelemetry.speed ||
+          nextTelemetry.gear !== previousTelemetry.gear ||
+          nextTelemetry.rpm !== previousTelemetry.rpm ||
+          nextTelemetry.section !== previousTelemetry.section ||
+          Math.abs(nextTelemetry.carX - previousTelemetry.carX) > 0.45 ||
+          Math.abs(nextTelemetry.carY - previousTelemetry.carY) > 0.2 ||
+          Math.abs(nextTelemetry.carZ - previousTelemetry.carZ) > 0.45
+        ) {
+          telemetryRef.current = nextTelemetry
+          setTelemetry(nextTelemetry)
+        }
       }
 
       renderer.render(rig.scene, camera)
@@ -422,6 +491,7 @@ export default function F1TrackPortfolio() {
       cancelled = true
       cancelAnimationFrame(animationFrame)
       window.removeEventListener("resize", resize)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
       rig?.dispose()
     }
   }, [nearestStation, revealStation, setNearbyResumeZone])
@@ -434,7 +504,7 @@ export default function F1TrackPortfolio() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 border-t-2 border-[#00D2BE]/45 bg-gradient-to-b from-[#00D2BE]/10 to-transparent" />
 
       <header className="absolute left-0 right-0 top-0 z-20 flex flex-col gap-4 p-4 md:flex-row md:items-start md:justify-end md:p-8">
-        <div className="w-[300px] rounded-3xl border border-white/10 bg-black/70 p-3 font-mono text-xs uppercase shadow-2xl backdrop-blur-xl">
+        <div className="w-[300px] rounded-3xl border border-white/10 bg-black/70 p-3 font-mono text-xs uppercase shadow-2xl">
           <div className="grid grid-cols-3 gap-2">
             <div><span className="block text-neutral-500">Speed</span><strong className="text-xl text-[#00D2BE]">{telemetry.speed}</strong></div>
             <div><span className="block text-neutral-500">Gear</span><strong className="text-xl text-white">{telemetry.gear}</strong></div>
@@ -469,7 +539,7 @@ export default function F1TrackPortfolio() {
         style={{ transformOrigin: "center center" }}
       >
         {activeStation ? (
-          <div className="pointer-events-auto w-full max-w-[520px] rounded-[2rem] border border-[#00D2BE]/35 bg-black/80 p-6 shadow-2xl shadow-[#00D2BE]/30 backdrop-blur-2xl md:p-8">
+          <div className="pointer-events-auto w-full max-w-[520px] rounded-[2rem] border border-[#00D2BE]/35 bg-black/80 p-6 shadow-2xl shadow-[#00D2BE]/30 md:p-8">
             <div className="flex items-center justify-between gap-4">
               <p className="text-[10px] uppercase tracking-[0.35em] text-[#00D2BE]">{activeStation.label}</p>
               <span className="rounded-full border border-[#00D2BE]/30 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-neutral-300">Modal unlocked</span>
@@ -487,12 +557,12 @@ export default function F1TrackPortfolio() {
       </aside>
 
       {nearbyStation && !activeStation ? (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2 rounded-full border border-[#00D2BE]/35 bg-black/70 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[#00D2BE] shadow-xl shadow-[#00D2BE]/10 backdrop-blur">
+        <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2 rounded-full border border-[#00D2BE]/35 bg-black/70 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[#00D2BE] shadow-xl shadow-[#00D2BE]/10">
           Stop to unlock {nearbyStation.label}
         </div>
       ) : null}
 
-      <div className="absolute bottom-4 left-4 z-10 hidden rounded-full border border-white/10 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-neutral-300 backdrop-blur md:block">
+      <div className="absolute bottom-4 left-4 z-10 hidden rounded-full border border-white/10 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-neutral-300 md:block">
         Controls: W accelerate - S brake/reverse - A/D steer - Space slow - stop in a glowing zone to open a modal
       </div>
 
@@ -501,7 +571,7 @@ export default function F1TrackPortfolio() {
       </div>
 
       {showWelcome && isSceneReady && !loadError && !activeStation && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-[480px] rounded-[2rem] border border-white/10 bg-[#0a0a14]/95 p-6 shadow-2xl md:p-8">
             <p className="text-[10px] uppercase tracking-[0.4em] text-[#00D2BE]">Sonny Au — Portfolio</p>
             <h2 className="mt-2 text-3xl font-black uppercase tracking-[-0.03em] text-white md:text-4xl">How do you want to explore?</h2>

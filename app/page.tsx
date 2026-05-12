@@ -41,7 +41,6 @@ export default function PortfolioCircuitPage() {
 
     gsap.set(mainContentRef.current, {
       autoAlpha: 0,
-      filter: prefersReducedMotion ? "none" : "blur(12px)",
       scale: prefersReducedMotion ? 1 : 0.985,
     })
 
@@ -53,7 +52,6 @@ export default function PortfolioCircuitPage() {
       requestAnimationFrame(() => {
         gsap.to(mainContentRef.current, {
           autoAlpha: 1,
-          filter: "blur(0px)",
           scale: 1,
           duration: prefersReducedMotion ? 0.01 : 1,
           ease: "power3.out",

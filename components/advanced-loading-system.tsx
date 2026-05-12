@@ -573,7 +573,6 @@ export default function AdvancedLoadingSystem({
         gsap.to(containerRef.current, {
           opacity: 0,
           scale: 1.1,
-          filter: "blur(10px)",
           duration: 0.8,
           ease: "power2.inOut",
           onComplete: () => {
@@ -693,7 +692,7 @@ export default function AdvancedLoadingSystem({
         <div className="flex gap-8">
           {/* RPM Gauge */}
           <div className="relative w-20 h-20">
-            <div className="absolute inset-0 rounded-full border-2 border-[#00D2BE]/40 bg-black/60 backdrop-blur-sm">
+            <div className="absolute inset-0 rounded-full border-2 border-[#00D2BE]/40 bg-black/60">
               <div className="absolute inset-2 rounded-full border border-red-500/50">
                 <div
                   ref={rpmNeedleRef}
@@ -712,7 +711,7 @@ export default function AdvancedLoadingSystem({
 
           {/* Speed Gauge */}
           <div className="relative w-20 h-20">
-            <div className="absolute inset-0 rounded-full border-2 border-[#00D2BE]/40 bg-black/60 backdrop-blur-sm">
+            <div className="absolute inset-0 rounded-full border-2 border-[#00D2BE]/40 bg-black/60">
               <div className="absolute inset-2 rounded-full border border-yellow-500/50">
                 <div
                   ref={speedNeedleRef}

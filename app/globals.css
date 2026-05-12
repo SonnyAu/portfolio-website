@@ -88,15 +88,8 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
-    /* GPU acceleration for better performance */
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    perspective: 1000px;
     /* Faster scroll behavior */
     scroll-behavior: auto;
-    /* Performance optimizations */
-    contain: layout style paint;
-    will-change: scroll-position;
   }
 
   /* Enhanced cursor hiding for desktop */
@@ -149,7 +142,6 @@
       /* Base gradient */
       linear-gradient(135deg, #0a0a0a 0%, #0d0d0d 25%, #0a0a0a 50%, #0e0e0e 75%, #0a0a0a 100%);
     background-size: 100% 100%, 100% 100%, 800px 800px, 600px 600px, 100% 100%;
-    will-change: background-position, opacity;
     animation: championshipTelemetry 60s linear infinite;
   }
 
@@ -185,7 +177,6 @@
         transparent 80%
       );
     background-size: 100% 100%, 400px 400px, 300px 300px, 100% 100%;
-    will-change: background-position, transform;
     animation: f1DataStream 45s ease-in-out infinite;
   }
 
@@ -245,7 +236,6 @@
         transparent 70%
       ),
       radial-gradient(ellipse at center, rgba(255, 255, 255, calc(var(--scroll-intensity) * 0.02)) 0%, transparent 50%);
-    will-change: opacity, transform;
     animation: championshipPulse 20s ease-in-out infinite;
   }
 
@@ -805,8 +795,6 @@ img {
 html {
   scroll-behavior: auto; /* Changed from smooth to auto for faster scrolling */
   scroll-padding-top: 80px;
-  /* Enable hardware acceleration */
-  transform: translateZ(0);
 }
 
 body {
@@ -815,9 +803,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  /* Enable GPU acceleration */
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 
 /* Constrain html and body during loading to prevent page from exceeding viewport height */
