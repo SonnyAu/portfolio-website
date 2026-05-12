@@ -125,6 +125,7 @@ export default function F1TrackPortfolio() {
   })
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSceneReady, setIsSceneReady] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
   const keys = useRef<Record<string, boolean>>({})
   const carState = useRef<CarState>({
     x: START_GRID.position[0],
@@ -414,6 +415,7 @@ export default function F1TrackPortfolio() {
 
     animationFrame = requestAnimationFrame(animate)
     setIsSceneReady(true)
+    setShowWelcome(true)
     gsap.set(overlayRef.current, { autoAlpha: 0, scale: 0.92 })
 
     return () => {
@@ -431,17 +433,7 @@ export default function F1TrackPortfolio() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,210,190,0.14),transparent_28%),radial-gradient(circle_at_82%_22%,rgba(255,200,150,0.10),transparent_24%),linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.55))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 border-t-2 border-[#00D2BE]/45 bg-gradient-to-b from-[#00D2BE]/10 to-transparent" />
 
-      <header className="absolute left-0 right-0 top-0 z-20 flex flex-col gap-4 p-4 md:flex-row md:items-start md:justify-between md:p-8">
-        <div className="max-w-4xl rounded-3xl border border-[#00D2BE]/25 bg-black/55 p-5 shadow-2xl shadow-[#00D2BE]/10 backdrop-blur-xl md:p-6">
-          <p className="text-[10px] uppercase tracking-[0.45em] text-[#00D2BE]">Mercedes-AMG W15 - Stylized Suzuka - Golden hour Japan</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-black uppercase leading-none tracking-[-0.06em] text-white md:text-7xl">
-            Drive the circuit.
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-300 md:text-base">
-            Pilot a procedural <span className="text-[#00D2BE]">W15 Formula car</span> across a stylized Suzuka figure-8 with the iconic crossover bridge. Mt. Fuji, sakura, pagoda, and the Tokyo skyline sit on the horizon. Stop inside a glowing checkpoint to open that portfolio module.
-          </p>
-        </div>
-
+      <header className="absolute left-0 right-0 top-0 z-20 flex flex-col gap-4 p-4 md:flex-row md:items-start md:justify-end md:p-8">
         <div className="w-[300px] rounded-3xl border border-white/10 bg-black/70 p-3 font-mono text-xs uppercase shadow-2xl backdrop-blur-xl">
           <div className="grid grid-cols-3 gap-2">
             <div><span className="block text-neutral-500">Speed</span><strong className="text-xl text-[#00D2BE]">{telemetry.speed}</strong></div>
@@ -507,6 +499,57 @@ export default function F1TrackPortfolio() {
       <div className="absolute left-4 top-1/2 z-10 hidden -translate-y-1/2 flex-col gap-2 md:flex">
         {stationButtons}
       </div>
+
+      {showWelcome && isSceneReady && !loadError && !activeStation && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-[480px] rounded-[2rem] border border-white/10 bg-[#0a0a14]/95 p-6 shadow-2xl md:p-8">
+            <p className="text-[10px] uppercase tracking-[0.4em] text-[#00D2BE]">Sonny Au — Portfolio</p>
+            <h2 className="mt-2 text-3xl font-black uppercase tracking-[-0.03em] text-white md:text-4xl">How do you want to explore?</h2>
+            <p className="mt-3 text-sm leading-6 text-neutral-400">
+              Pick a path. You can switch any time using the buttons on the side.
+            </p>
+
+            <div className="mt-6 grid gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWelcome(false)
+                  if (stationsList[0]) jumpToStation(stationsList[0])
+                }}
+                className="group rounded-2xl border border-[#00D2BE]/40 bg-[#00D2BE]/10 p-4 text-left transition hover:border-[#00D2BE] hover:bg-[#00D2BE]/15"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#00D2BE]">View Resume</span>
+                  <span className="text-[10px] uppercase tracking-[0.22em] text-neutral-400 group-hover:text-[#00D2BE]">Recommended</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-neutral-300">
+                  Jump straight to my background — about, experience, skills, projects, and contact.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowWelcome(false)}
+                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/30 hover:bg-white/[0.06]"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold uppercase tracking-[0.2em] text-white">Drive the Track</span>
+                  <span className="text-[10px] uppercase tracking-[0.22em] text-neutral-400">Interactive</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-neutral-400">
+                  Drive a car around the circuit and stop inside a glowing zone to open a section.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+                  <span className="rounded border border-white/10 bg-black/40 px-2 py-1">W accelerate</span>
+                  <span className="rounded border border-white/10 bg-black/40 px-2 py-1">S brake</span>
+                  <span className="rounded border border-white/10 bg-black/40 px-2 py-1">A / D steer</span>
+                  <span className="rounded border border-white/10 bg-black/40 px-2 py-1">Space slow</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(!isSceneReady || loadError) && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0a0a14] text-center">
