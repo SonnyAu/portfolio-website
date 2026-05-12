@@ -18,11 +18,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://sonnyau.dev"),
   title: {
-    default: "Sonny Au - Elite Software Engineer | React Native & AI Specialist | F1-Inspired Portfolio",
-    template: "%s | Sonny Au - Championship-Level Software Engineering",
+    default: "Sonny Au",
+    template: "%s | Sonny Au",
   },
   description:
-    "🏆 President's Scholar at SJSU with 3.75 GPA specializing in championship-level full-stack development, React Native mobile apps, and machine learning. Co-founder of PalAte serving 1,000+ users. Currently Frontend React Developer Intern at GBCS Group achieving 900% performance improvements. Available for elite software engineering opportunities.",
+    "Software engineer based in the Bay Area. Full-stack and mobile development with React, Next.js, and React Native.",
   keywords: [
     // Primary keywords
     "Sonny Au",
@@ -100,25 +100,25 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://sonnyau.dev",
-    siteName: "Sonny Au - Elite Software Engineer Portfolio",
-    title: "Sonny Au - Elite Software Engineer | React Native & AI Specialist",
+    siteName: "Sonny Au",
+    title: "Sonny Au",
     description:
-      "🏆 President's Scholar at SJSU specializing in championship-level full-stack development, React Native mobile apps, and machine learning. Co-founder of PalAte with 1,000+ users achieving 900% performance improvements.",
+      "Software engineer based in the Bay Area. Full-stack and mobile development with React, Next.js, and React Native.",
     images: [
       {
         url: "/placeholder.jpg", // TODO: Replace with actual og-image.jpg when created
         width: 1200,
         height: 630,
-        alt: "Sonny Au - Elite Software Engineer Portfolio with F1-Inspired Design",
+        alt: "Sonny Au — Portfolio",
         type: "image/jpeg",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sonny Au - Elite Software Engineer | F1-Inspired Portfolio",
+    title: "Sonny Au",
     description:
-      "🏆 President's Scholar at SJSU | React Native & AI Specialist | Co-founder of PalAte | 900% Performance Improvements | Available for Elite Opportunities",
+      "Software engineer based in the Bay Area. Full-stack and mobile development with React, Next.js, and React Native.",
     images: ["/placeholder.jpg"], // TODO: Replace with actual og-image.jpg when created
     creator: "@sonnyau_dev",
     site: "@sonnyau_dev",
@@ -144,7 +144,7 @@ export const metadata: Metadata = {
   applicationName: "Sonny Au Portfolio",
   appleWebApp: {
     capable: true,
-    title: "Sonny Au - Software Engineer",
+    title: "Sonny Au",
     statusBarStyle: "black-translucent",
   },
   other: {
